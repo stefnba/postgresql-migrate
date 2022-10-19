@@ -14,7 +14,5 @@ CREATE TABLE IF NOT EXISTS "Auth_Logins" (
 /* BEGIN_DOWN */
 DROP TABLE IF EXISTS "User_Users";
 
-DROP TABLE IF EXISTS "Auth_Logins";
-
-
+DROP TABLE IF EXISTS "Auth_Logins"
 /* END_DOWN */

@@ -5,7 +5,7 @@
     "main": "lib/index.js",
     "types": "lib/types.d.ts",
     "scripts": {
-        "build": "tsc -w --copy-files"
+        "build": "tsc && copyfiles -u 1 \"src/db/sql/*.sql\" \"lib\""
     },
     "bin": {
         "app": "ts-node src/index.ts"
@@ -21,21 +21,24 @@
     "author": "Stefan Bauer",
     "license": "MIT",
     "devDependencies": {
-        "typescript": "^4.8.4",
-        "prettier": "^2.7.1",
         "@types/node": "^18.8.2",
         "@typescript-eslint/eslint-plugin": "^5.39.0",
         "@typescript-eslint/parser": "^5.39.0",
+        "copyfiles": "^2.4.1",
         "eslint": "^7.32.0",
         "eslint-config-prettier": "^8.5.0",
         "eslint-plugin-prettier": "^4.2.1",
         "nodemon": "^2.0.20",
-        "ts-node": "^10.9.1"
+        "prettier": "^2.7.1",
+        "ts-node": "^10.9.1",
+        "typescript": "^4.8.4"
     },
     "files": [
         "lib/**/*"
     ],
     "dependencies": {
+        "chalk": "^4.1.2",
+        "dayjs": "^1.11.5",
         "pg-promise": "^10.12.0"
     }
 }

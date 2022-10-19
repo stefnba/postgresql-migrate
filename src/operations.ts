@@ -1,5 +1,7 @@
-import { readdirSync, readFileSync } from 'fs';
+import { readdirSync, readFileSync, writeFileSync } from 'fs';
+import chalk from 'chalk';
 import path from 'path';
+import dayjs from 'dayjs';
 
 import { dbQuery, queries, pgp } from './db';
 import { DEFAULTS, CONFIG, CONFIG_FILE } from './index';
@@ -9,14 +11,13 @@ import type {
     MigrationTableModel
 } from './types';
 
+const MIGRRATION_DIR = path.join(path.dirname(CONFIG_FILE), CONFIG.dir);
+
 /**
  * Reads all files and selects .sql ones in migration dir
  */
 export const readMigrationsFiles = () => {
-    // todo list files only sql
-    const migrationDir = path.join(path.dirname(CONFIG_FILE), CONFIG.dir);
-
-    const dirFiles = readdirSync(migrationDir);
+    const dirFiles = readdirSync(MIGRRATION_DIR);
 
     const migrationFiles: MigrationFileObj[] = [];
 
@@ -26,7 +27,7 @@ export const readMigrationsFiles = () => {
             const [ts, title] = f.split('_');
 
             migrationFiles.push({
-                fullpath: path.join(migrationDir, f),
+                fullpath: path.join(MIGRRATION_DIR, f),
                 name: f,
                 ts,
                 title
@@ -70,9 +71,8 @@ export const listAppliedMigrations = async () => {
             table: DEFAULTS.migrationTable
         }
     );
-    console.log(appliedMigrations);
 
-    return appliedMigrations;
+    return appliedMigrations.map((m) => m.filename);
 };
 
 export const runMigrations = async (operation: OperationType = 'UP') => {
@@ -93,6 +93,13 @@ export const runMigrations = async (operation: OperationType = 'UP') => {
         .tx('run_migrations', async (t) => {
             return Promise.all(
                 migrations.map(async (m) => {
+                    // if migration has already been applied, only for up
+                    if (
+                        appliedMigrations.includes(m.name) &&
+                        operation === 'UP'
+                    )
+                        return;
+
                     const sql = readMigrationFile(m?.fullpath, operation);
 
                     // execute migration
@@ -112,14 +119,14 @@ export const runMigrations = async (operation: OperationType = 'UP') => {
                                 DEFAULTS.migrationTable
                             )
                         );
-                        console.info(`Migration UP ${m.name} executed`);
+                        console.info(`> UP ${m.name} executed`);
                     }
                     if (operation === 'DOWN') {
                         await t.none(queries.dml.delete, {
                             filename: m.name,
                             table: DEFAULTS.migrationTable
                         });
-                        console.info(`Migration DOWN ${m.name} executed`);
+                        console.info(`> DOWN ${m.name} executed`);
                     }
 
                     return;
@@ -127,11 +134,26 @@ export const runMigrations = async (operation: OperationType = 'UP') => {
             );
         })
         .then(() => {
-            console.log('Migrations successful!');
+            console.log(chalk.white.bgGreen.bold('Migration successful'));
             return;
         })
-        .catch(() => {
-            console.log('Migrations failed!');
+        .catch((e) => {
+            console.log(chalk.white.bgRed.bold('Migration failed'));
+            console.log(e);
             return;
         });
+};
+
+/**
+ * Creates new migration file in migration dir
+ * @param name
+ */
+export const newMigrationFile = (name: string) => {
+    // todo replace chars in name string
+    const template = readFileSync(DEFAULTS.templateFile, { encoding: 'utf-8' });
+
+    const filename = `${dayjs().valueOf()}_${name}.sql`;
+    // const filename = `${dayjs().format('YYYYMMDD-HHmmssSSS')}_${name}.sql`;
+    const fullpath = path.join(MIGRRATION_DIR, filename);
+    writeFileSync(fullpath, template, { encoding: 'utf-8' });
 };

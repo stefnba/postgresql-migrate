@@ -7,7 +7,7 @@ export const CONFIG_FILE = 'app/config.json';
 //
 export const CONFIG = readConfigFile(CONFIG_FILE);
 
-import { runMigrations } from './operations';
+import { runMigrations, newMigrationFile } from './operations';
 
 export const DEFAULTS = {
     templateFile: 'src/template.sql',
@@ -17,4 +17,6 @@ export const DEFAULTS = {
 // expose CLI operations
 export const migrateUp = runMigrations;
 
-migrateUp('UP');
+// migrateUp('DOWN');
+
+newMigrationFile('Users-init');

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import type { ConfigObj } from './types';
 
 export const readConfigFile = (path: string): ConfigObj => {
@@ -6,7 +6,7 @@ export const readConfigFile = (path: string): ConfigObj => {
         throw new Error('A valid path to a config file must be provided.');
 
     const configFile = readFileSync(path, { encoding: 'utf8' });
-    console.log('File is read!');
+    // console.log('File is read!');
     let config: ConfigObj;
 
     // read json
