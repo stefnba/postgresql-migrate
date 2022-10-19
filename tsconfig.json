@@ -1,11 +1,13 @@
 {
     "compilerOptions": {
-        "target": "ES2016",
+        "target": "es2016",
         "module": "commonjs",
         "declaration": true,
         "outDir": "./lib",
-        "strict": true
+        "strict": true,
+        "esModuleInterop": true,
+        "sourceMap": true
     },
-    "include": ["src"],
+    "include": ["src", "*.sql"],
     "exclude": ["node_modules", "**/__tests__/*"]
 }

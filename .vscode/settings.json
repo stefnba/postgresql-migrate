@@ -17,5 +17,9 @@
     // specifiy standard connection for postgres extension
     "vscode-postgres.defaultConnection": "app_db",
     "vscode-postgres.defaultDatabase": "app_db",
-    "vscode-postgres.prettyPrintJSONfields": true
+    "vscode-postgres.prettyPrintJSONfields": true,
+    "[postgres]": {
+        "editor.defaultFormatter": "bradymholt.pgformatter"
+    },
+    "pgFormatter.placeholder": "\\$\\<[a-zA-Z]+:?[a-zA-Z]*\\>"
 }

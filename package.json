@@ -1,34 +1,29 @@
 {
-  "name": "ts-pg-migrate",
-  "version": "1.0.0",
-  "description": "",
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
-  "scripts": {
-    "test": "jest --config jestconfig.json",
-    "build": "tsc",
-    "format": "prettier --write \"src/**/*.ts\" \"src/**/*.js\"",
-    "lint": "tslint -p tsconfig.json",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm test && npm run lint",
-    "preversion": "npm run lint",
-    "version": "npm run format && git add -A src",
-    "postversion": "git push && git push --tags"
-  },
-  "keywords": [
-    "pg",
-    "postgres",
-    "migration",
-    "ts",
-    "typescript",
-    "database"
-  ],
-  "author": "Stefan Bauer",
-  "license": "MIT",
-  "devDependencies": {
-      "typescript": "^4.8.4",
-    "prettier": "^2.7.1",
-    "@types/node": "^18.8.2",
+    "name": "ts-pg-migrate",
+    "version": "1.0.0",
+    "description": "",
+    "main": "lib/index.js",
+    "types": "lib/types.d.ts",
+    "scripts": {
+        "build": "tsc -w --copy-files"
+    },
+    "bin": {
+        "app": "ts-node src/index.ts"
+    },
+    "keywords": [
+        "pg",
+        "postgres",
+        "migration",
+        "ts",
+        "typescript",
+        "database"
+    ],
+    "author": "Stefan Bauer",
+    "license": "MIT",
+    "devDependencies": {
+        "typescript": "^4.8.4",
+        "prettier": "^2.7.1",
+        "@types/node": "^18.8.2",
         "@typescript-eslint/eslint-plugin": "^5.39.0",
         "@typescript-eslint/parser": "^5.39.0",
         "eslint": "^7.32.0",
@@ -36,11 +31,11 @@
         "eslint-plugin-prettier": "^4.2.1",
         "nodemon": "^2.0.20",
         "ts-node": "^10.9.1"
-  },
-  "files": [
-    "lib/**/*"
-  ],
-  "dependencies": {
-    "pg-promise": "^10.12.0"
-  }
+    },
+    "files": [
+        "lib/**/*"
+    ],
+    "dependencies": {
+        "pg-promise": "^10.12.0"
+    }
 }

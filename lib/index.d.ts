@@ -1,7 +1,8 @@
-export declare function helloWorld(): string;
-export declare function goodBye(): string;
-declare const _default: {
-    helloWorld: typeof helloWorld;
-    goodBye: typeof goodBye;
+#!/usr/bin/env node
+export declare const CONFIG_FILE = "app/config.json";
+export declare const CONFIG: import("./types").ConfigObj;
+export declare const DEFAULTS: {
+    templateFile: string;
+    migrationTable: string;
 };
-export default _default;
+export declare const migrateUp: (operation?: import("./types").OperationType) => Promise<void>;
