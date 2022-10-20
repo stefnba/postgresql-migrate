@@ -1,22 +1,58 @@
 #!/usr/bin/env node
+import yargs from 'yargs';
+import chalk from 'chalk';
 
-import { readConfigFile } from './config';
+import { runMigrations, newMigrationFile, readConfigFile } from './operations';
+import type { ActionType } from './types';
 
-export const CONFIG_FILE = 'app/config.json';
+process.on('uncaughtException', (err) => {
+    console.error(err);
+    process.exit(1);
+});
 
-//
-export const CONFIG = readConfigFile(CONFIG_FILE);
+const argv = yargs
+    .usage('Usage: $0 [up|down|create] [config]')
+    .option('f', {
+        alias: 'config-file',
+        describe: 'Path to config file, should be .json',
+        type: 'string'
+    })
+    .help()
+    .version()
+    .parseSync();
 
-import { runMigrations, newMigrationFile } from './operations';
+const action = argv._.shift() as ActionType;
 
-export const DEFAULTS = {
-    templateFile: 'src/template.sql',
-    migrationTable: '_migrations'
-};
+// Check if valid commands are provided
+if (argv.help || !['up', 'down', 'create'].includes(action)) {
+    yargs.showHelp();
+    process.exit(1);
+}
 
-// expose CLI operations
-export const migrateUp = runMigrations;
+// Check for config file
+const configFilePath = argv['f'];
+if (!configFilePath || !(typeof configFilePath === 'string')) {
+    console.error(chalk.red('Must provide a path to a config json!'));
+    process.exit(1);
+}
+let config = null;
+try {
+    config = readConfigFile(configFilePath);
+} catch (e) {
+    console.error(chalk.red("Couldn't find config json!"));
+    console.log(e);
+    process.exit(1);
+}
 
-// migrateUp('DOWN');
+if (action === 'create') {
+    const name = argv._[0];
+    if (!name || !(typeof name === 'string')) {
+        console.error(chalk.red('Must provide a name for the migration file!'));
+        process.exit(1);
+    }
+    newMigrationFile(name, config);
+}
 
-newMigrationFile('Users-init');
+if (action === 'up' || action === 'down') {
+    runMigrations(action, config);
+}

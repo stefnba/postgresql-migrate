@@ -1,5 +1,5 @@
 export type ConfigObj = {
-    dir: string;
+    migrationDir: string;
     migrationTable: string;
     database: {
         host: string;
@@ -17,7 +17,8 @@ export type MigrationFileObj = {
     title: string;
 };
 
-export type OperationType = 'UP' | 'DOWN';
+export type ActionType = 'up' | 'down' | 'create';
+export type OperationType = 'up' | 'down';
 
 export type MigrationTableModel = {
     id: number;

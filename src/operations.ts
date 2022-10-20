@@ -3,21 +3,22 @@ import chalk from 'chalk';
 import path from 'path';
 import dayjs from 'dayjs';
 
-import { dbQuery, queries, pgp } from './db';
-import { DEFAULTS, CONFIG, CONFIG_FILE } from './index';
+import { queries, pgp } from './db';
+import DEFAULTS from './defaults';
 import type {
     MigrationFileObj,
     OperationType,
-    MigrationTableModel
+    MigrationTableModel,
+    ConfigObj
 } from './types';
-
-const MIGRRATION_DIR = path.join(path.dirname(CONFIG_FILE), CONFIG.dir);
+import { IDatabase } from 'pg-promise';
+import pg from 'pg-promise/typescript/pg-subset';
 
 /**
  * Reads all files and selects .sql ones in migration dir
  */
-export const readMigrationsFiles = () => {
-    const dirFiles = readdirSync(MIGRRATION_DIR);
+export const readMigrationsFiles = (migrationDir: string) => {
+    const dirFiles = readdirSync(migrationDir);
 
     const migrationFiles: MigrationFileObj[] = [];
 
@@ -27,7 +28,7 @@ export const readMigrationsFiles = () => {
             const [ts, title] = f.split('_');
 
             migrationFiles.push({
-                fullpath: path.join(MIGRRATION_DIR, f),
+                fullpath: path.join(migrationDir, f),
                 name: f,
                 ts,
                 title
@@ -48,11 +49,11 @@ export const readMigrationFile = (
     const content = readFileSync(path, { encoding: 'utf-8' });
 
     const operationStrings = {
-        UP: {
+        up: {
             begin: '/* BEGIN_UP */',
             end: '/* END_UP */'
         },
-        DOWN: {
+        down: {
             begin: '/* BEGIN_DOWN */',
             end: '/* END_DOWN */'
         }
@@ -64,7 +65,10 @@ export const readMigrationFile = (
     );
 };
 
-export const listAppliedMigrations = async () => {
+export const listAppliedMigrations = async (
+    // eslint-disable-next-line @typescript-eslint/ban-types
+    dbQuery: IDatabase<{}, pg.IClient>
+) => {
     const appliedMigrations = await dbQuery.manyOrNone<MigrationTableModel>(
         queries.dml.list,
         {
@@ -75,9 +79,14 @@ export const listAppliedMigrations = async () => {
     return appliedMigrations.map((m) => m.filename);
 };
 
-export const runMigrations = async (operation: OperationType = 'UP') => {
+export const runMigrations = async (
+    operation: OperationType = 'up',
+    config: ConfigObj
+) => {
     // get all migration files
-    const migrations = readMigrationsFiles();
+    const migrations = readMigrationsFiles(config.migrationDir);
+
+    const dbQuery = pgp(config.database);
 
     // create migration table, if not yet exists
     await dbQuery.none(queries.ddl.create, {
@@ -85,7 +94,7 @@ export const runMigrations = async (operation: OperationType = 'UP') => {
     });
 
     // list all migration that have been run, from db table
-    const appliedMigrations = await listAppliedMigrations();
+    const appliedMigrations = await listAppliedMigrations(dbQuery);
 
     // return;
 
@@ -96,7 +105,7 @@ export const runMigrations = async (operation: OperationType = 'UP') => {
                     // if migration has already been applied, only for up
                     if (
                         appliedMigrations.includes(m.name) &&
-                        operation === 'UP'
+                        operation === 'up'
                     )
                         return;
 
@@ -106,7 +115,7 @@ export const runMigrations = async (operation: OperationType = 'UP') => {
                     await t.none(sql);
 
                     // record migration in _migrations table
-                    if (operation === 'UP') {
+                    if (operation === 'up') {
                         await t.none(
                             pgp.helpers.insert(
                                 {
@@ -121,7 +130,7 @@ export const runMigrations = async (operation: OperationType = 'UP') => {
                         );
                         console.info(`> UP ${m.name} executed`);
                     }
-                    if (operation === 'DOWN') {
+                    if (operation === 'down') {
                         await t.none(queries.dml.delete, {
                             filename: m.name,
                             table: DEFAULTS.migrationTable
@@ -148,12 +157,36 @@ export const runMigrations = async (operation: OperationType = 'UP') => {
  * Creates new migration file in migration dir
  * @param name
  */
-export const newMigrationFile = (name: string) => {
+export const newMigrationFile = (name: string, config: ConfigObj) => {
     // todo replace chars in name string
     const template = readFileSync(DEFAULTS.templateFile, { encoding: 'utf-8' });
 
     const filename = `${dayjs().valueOf()}_${name}.sql`;
     // const filename = `${dayjs().format('YYYYMMDD-HHmmssSSS')}_${name}.sql`;
-    const fullpath = path.join(MIGRRATION_DIR, filename);
+    const fullpath = path.join(config.migrationDir, filename);
     writeFileSync(fullpath, template, { encoding: 'utf-8' });
+};
+
+/**
+ * Reads config json and return config object
+ * @param path
+ * @returns config object
+ */
+export const readConfigFile = (configFilePath: string) => {
+    try {
+        const configFile = readFileSync(configFilePath, { encoding: 'utf8' });
+        const config = JSON.parse(configFile) as ConfigObj;
+
+        // make migrationDir absolut, as it should be provided relative to config path in json
+        const absolutPath = path.join(
+            path.dirname(configFilePath),
+            config.migrationDir
+        );
+        console.log(absolutPath);
+        config['migrationDir'] = absolutPath;
+        return config;
+    } catch (e) {
+        console.log(e);
+        throw new Error('A valid path to a config file must be provided.');
+    }
 };
