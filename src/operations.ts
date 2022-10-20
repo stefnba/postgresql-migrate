@@ -158,7 +158,12 @@ export const runMigrations = async (
  */
 export const newMigrationFile = (name: string, config: ConfigObj) => {
     // todo replace chars in name string
-    const template = readFileSync(DEFAULTS.templateFile, { encoding: 'utf-8' });
+    console.log(DEFAULTS.templateFile);
+    console.log(path.join(path.dirname(__dirname), DEFAULTS.templateFile));
+    const template = readFileSync(
+        path.join(path.dirname(__dirname), DEFAULTS.templateFile),
+        { encoding: 'utf-8' }
+    );
 
     const filename = `${dayjs().valueOf()}_${name}.sql`;
     // const filename = `${dayjs().format('YYYYMMDD-HHmmssSSS')}_${name}.sql`;
