@@ -13,7 +13,7 @@ export type ConfigObj = {
 export type MigrationFileObj = {
     fullpath: string;
     name: string;
-    ts: string;
+    ts: number;
     title: string;
 };
 

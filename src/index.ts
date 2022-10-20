@@ -23,13 +23,17 @@ const argv = yargs
 
 const action = argv._.shift() as ActionType;
 
-// Check if valid commands are provided
+/**
+ * VALID COMMANDS
+ */
 if (argv.help || !['up', 'down', 'create'].includes(action)) {
     yargs.showHelp();
     process.exit(1);
 }
 
-// Check for config file
+/**
+ * CONFIG FILE
+ */
 const configFilePath = argv['f'];
 if (!configFilePath || !(typeof configFilePath === 'string')) {
     console.error(chalk.red('Must provide a path to a config json!'));
@@ -44,6 +48,9 @@ try {
     process.exit(1);
 }
 
+/**
+ * ACTIONS
+ */
 if (action === 'create') {
     const name = argv._[0];
     if (!name || !(typeof name === 'string')) {
@@ -51,8 +58,15 @@ if (action === 'create') {
         process.exit(1);
     }
     newMigrationFile(name, config);
+    process.exit(1);
 }
 
 if (action === 'up' || action === 'down') {
-    runMigrations(action, config);
+    const steps = (argv._[0] as number) || null;
+    if (steps && !Number.isInteger(steps)) {
+        console.error(chalk.red('Steps must be an integer!'));
+        process.exit(1);
+    }
+    runMigrations(action, steps, config);
+    process.exit(1);
 }

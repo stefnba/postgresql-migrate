@@ -30,7 +30,7 @@ export const readMigrationsFiles = (migrationDir: string) => {
             migrationFiles.push({
                 fullpath: path.join(migrationDir, f),
                 name: f,
-                ts,
+                ts: Number.parseInt(ts),
                 title
             });
         }
@@ -81,6 +81,7 @@ export const listAppliedMigrations = async (
 
 export const runMigrations = async (
     operation: OperationType = 'up',
+    steps: number | null = null,
     config: ConfigObj
 ) => {
     // get all migration files
@@ -95,8 +96,6 @@ export const runMigrations = async (
 
     // list all migration that have been run, from db table
     const appliedMigrations = await listAppliedMigrations(dbQuery);
-
-    // return;
 
     return dbQuery
         .tx('run_migrations', async (t) => {
@@ -121,7 +120,7 @@ export const runMigrations = async (
                                 {
                                     filename: m.name,
                                     title: m.title,
-                                    createdAt: m.ts,
+                                    createdAt: dayjs(m.ts).toISOString(),
                                     runAt: new Date()
                                 },
                                 null,
@@ -182,7 +181,6 @@ export const readConfigFile = (configFilePath: string) => {
             path.dirname(configFilePath),
             config.migrationDir
         );
-        console.log(absolutPath);
         config['migrationDir'] = absolutPath;
         return config;
     } catch (e) {
