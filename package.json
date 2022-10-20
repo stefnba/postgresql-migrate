@@ -10,6 +10,10 @@
         "copy": "copyfiles -u 1 \"src/db/sql/*.sql\" \"lib\""
     },
     "bin": "lib/index.js",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/stefnba/postgresql-migrate.git"
+    },
     "keywords": [
         "pg",
         "postgresql",
