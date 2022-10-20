@@ -131,14 +131,14 @@ export class Migration {
                                     DEFAULTS.migrationTable
                                 )
                             );
-                            console.info(`> UP ${m.name} executed`);
+                            console.info(`> UP executed: ${m.name}`);
                         }
                         if (this.direction === 'down') {
                             await t.none(queries.dml.delete, {
                                 filename: m.name,
                                 table: DEFAULTS.migrationTable
                             });
-                            console.info(`> DOWN ${m.name} executed`);
+                            console.info(`> DOWN executed: ${m.name}`);
                         }
 
                         return;
