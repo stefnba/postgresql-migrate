@@ -1,11 +1,10 @@
 {
     "migrationDir": "./migrations",
     "database": {
-        "host": "localhost",
-        "port": 5410,
-        "user": "admin",
-        "password": "password",
-        "database": "app_db"
-    },
-    "test": "env:HOST"
+        "host": "env:DB_HOST",
+        "port": "env:DB_PORT",
+        "user": "env:DB_ADMIN_USER",
+        "password": "env:DB_ADMIN_PASSWORD",
+        "database": "env:DB_NAME"
+    }
 }

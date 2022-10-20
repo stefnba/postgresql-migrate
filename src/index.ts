@@ -2,7 +2,7 @@
 import yargs from 'yargs';
 import chalk from 'chalk';
 
-import { runMigrations, newMigrationFile, readConfigFile } from './operations';
+import { Migration, newMigrationFile, readConfigFile } from './operations';
 import type { ActionType } from './types';
 
 process.on('uncaughtException', (err) => {
@@ -67,6 +67,9 @@ if (action === 'up' || action === 'down') {
         console.error(chalk.red('Steps must be an integer!'));
         process.exit(1);
     }
-    runMigrations(action, steps, config);
-    process.exit(1);
+
+    const migration = new Migration(config);
+    migration.run(action, steps);
+
+    // process.exit(1);
 }
