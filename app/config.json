@@ -1,5 +1,6 @@
 {
     "migrationDir": "./migrations",
+    "typeFile": "./types.d.ts",
     "database": {
         "host": "env:DB_HOST",
         "port": "env:DB_PORT",

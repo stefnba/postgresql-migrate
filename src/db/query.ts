@@ -13,5 +13,8 @@ export default {
     },
     ddl: {
         create: sqlFile('createMigrationTable.sql')
+    },
+    types: {
+        list: sqlFile('getColumnTypes.sql')
     }
 };

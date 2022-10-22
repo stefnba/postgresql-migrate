@@ -10,7 +10,8 @@ import type {
     MigrationFileObj,
     OperationType,
     MigrationTableModel,
-    ConfigObj
+    ConfigObj,
+    ColumnTypesModel
 } from './types';
 import { IDatabase } from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
@@ -86,6 +87,61 @@ export class Migration {
         return appliedMigrations.map((m) => m.filename);
     }
 
+    private async listDataTypes() {
+        const columns = await this.dbQuery.manyOrNone<ColumnTypesModel>(
+            queries.types.list,
+            {
+                schemaName: 'public',
+                migrationTable: DEFAULTS.migrationTable
+            }
+        );
+        return columns;
+    }
+
+    /**
+     * Converts postgres data types to data types for TypeScript
+     * @returns types string for TypeScript
+     */
+    private async parseDataTypes(): Promise<string> {
+        const columns = await this.listDataTypes();
+
+        return columns
+            .map((col) => {
+                const { tableName, columns } = col;
+                const colTypes = columns.map((c) => {
+                    console.log(c.dataType, c.isNullable);
+                    return `${c.columnName}${
+                        c.isNullable === 'YES' ? '?' : ''
+                    }: ${
+                        DEFAULTS.dataTypeConversion[c.dataType] || 'unknown'
+                    };`;
+                });
+
+                const type = `export type ${tableName} = { \n${colTypes.join(
+                    '\n'
+                )} }\n`;
+                return type;
+            })
+            .join('\n');
+    }
+
+    /**
+     * Creates types.d.ts file with data types from database
+     */
+    private async createDataTypeFile() {
+        const dataTypes = await this.parseDataTypes();
+        writeFileSync(this.config.typeFile, dataTypes, {
+            encoding: 'utf8'
+        });
+        return;
+    }
+
+    /**
+     * Executues migration against database
+     * @param direction upwards or down
+     * @param steps how many migration files to run
+     * @returns
+     */
     async run(direction: OperationType = 'up', steps: number | null = null) {
         this.direction = direction;
 
@@ -145,8 +201,10 @@ export class Migration {
                     })
                 );
             })
-            .then(() => {
+            .then(async () => {
                 console.log(chalk.white.bgGreen.bold('Migration successful'));
+
+                await this.createDataTypeFile();
                 return;
             })
             .catch((e) => {
@@ -195,6 +253,13 @@ export const readConfigFile = (configFilePath: string) => {
             config.migrationDir
         );
         config['migrationDir'] = absolutPath;
+
+        // make typeFile absolut
+        const absolutTypeFile = path.join(
+            path.dirname(configFilePath),
+            config.typeFile
+        );
+        config['typeFile'] = absolutTypeFile;
 
         // integrate env variables for nested database
         const database = config.database;

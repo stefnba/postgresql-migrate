@@ -1,6 +1,11 @@
+import dataTypeConversion from './defaults';
+
+// const { dataTypeConversion } = dataTypeConversion;
+
 export type ConfigObj = {
     migrationDir: string;
     migrationTable: string;
+    typeFile: string;
     database: {
         host: string;
         port: number;
@@ -26,4 +31,13 @@ export type MigrationTableModel = {
     title: string;
     createdAt: Date;
     runAt: Date;
+};
+
+export type ColumnTypesModel = {
+    tableName: string;
+    columns: Array<{
+        columnName: string;
+        dataType: keyof typeof dataTypeConversion.dataTypeConversion;
+        isNullable: 'YES' | 'NO';
+    }>;
 };
