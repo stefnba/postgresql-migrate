@@ -21,6 +21,7 @@ export type MigrationFileObj = {
     name: string;
     ts: number;
     title: string;
+    applied: boolean;
 };
 
 export type ActionType = 'up' | 'down' | 'create' | 'redo' | 'reset';

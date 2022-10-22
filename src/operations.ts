@@ -32,27 +32,36 @@ export class Migration {
     /**
      * Reads all files and selects .sql ones in migration dir
      */
-    private listMigrationsFiles() {
+    private listMigrationsFiles(appliedMigrations: string[]) {
         const dirFiles = readdirSync(this.config.migrationDir);
 
         const migrationFiles: MigrationFileObj[] = [];
+        const tsList: Array<number> = [];
 
         dirFiles.forEach((f) => {
             if (f.endsWith('.sql')) {
                 // todo check if filename is correct
-                const [ts, title] = f.split('_');
+                const [ts_, title] = f.split('_');
+                const ts = Number.parseInt(ts_);
+
+                // check that migration files have different ts
+                if (tsList.includes(ts))
+                    throw new Error(
+                        'Multiple migration files have the same timestamp!'
+                    );
+                tsList.push(ts);
 
                 migrationFiles.push({
                     fullpath: path.join(this.config.migrationDir, f),
                     name: f,
-                    ts: Number.parseInt(ts),
-                    title
+                    ts,
+                    title,
+                    applied: appliedMigrations.includes(f)
                 });
             }
         });
 
-        //
-        return migrationFiles;
+        return migrationFiles.sort((a, b) => a.ts - b.ts);
     }
 
     /**
@@ -80,7 +89,7 @@ export class Migration {
             await this.dbQuery.manyOrNone<MigrationTableModel>(
                 queries.dml.list,
                 {
-                    table: DEFAULTS.migrationTable
+                    table: this.config.migrationTable || DEFAULTS.migrationTable
                 }
             );
 
@@ -147,32 +156,37 @@ export class Migration {
     async run(direction: OperationType = 'up', steps: number | null = null) {
         this.direction = direction;
 
-        // get all migration files
-        const migrations = this.listMigrationsFiles();
-
         // create migration table, if not yet exists
         await this.dbQuery.none(queries.ddl.create, {
-            table: DEFAULTS.migrationTable
+            table: this.config.migrationTable || DEFAULTS.migrationTable
         });
 
-        // list all migration that have been run, from db table
+        // list all migration that have been applied, from db table
         const appliedMigrations = await this.listAppliedMigrations();
+
+        // get all migration files
+        const migrationFiles = this.listMigrationsFiles(appliedMigrations);
+
+        // filter which migration files to apply
+        let migrationsToRun = migrationFiles;
+        if (this.direction === 'up') {
+            // remove all applied ones
+            migrationsToRun = migrationsToRun.filter((m) => !m.applied);
+            // apply only n steps
+            if (steps) {
+                migrationsToRun = migrationsToRun.slice(0, steps);
+            }
+        }
+        if (this.direction === 'down' && steps) {
+            migrationsToRun = migrationsToRun
+                .filter((m) => m.applied)
+                .slice(-steps);
+        }
 
         return this.dbQuery
             .tx('run_migrations', async (t) => {
                 return Promise.all(
-                    migrations.map(async (m) => {
-                        // if migration has already been applied, only for up
-                        if (
-                            appliedMigrations.includes(m.name) &&
-                            this.direction === 'up'
-                        )
-                            return {
-                                name: m.name,
-                                success: false,
-                                msg: 'Already applied'
-                            };
-
+                    migrationsToRun.map(async (m) => {
                         const sql = this.readMigrationFile(m?.fullpath);
                         if (!sql || sql.trim() == '') {
                             return {
@@ -192,18 +206,20 @@ export class Migration {
                                     {
                                         filename: m.name,
                                         title: m.title,
-                                        createdAt: dayjs(m.ts).toISOString(),
-                                        runAt: new Date()
+                                        createdAt: dayjs(m.ts).toISOString()
                                     },
                                     null,
-                                    DEFAULTS.migrationTable
+                                    this.config.migrationTable ||
+                                        DEFAULTS.migrationTable
                                 )
                             );
                         }
                         if (this.direction === 'down') {
                             await t.none(queries.dml.delete, {
                                 filename: m.name,
-                                table: DEFAULTS.migrationTable
+                                table:
+                                    this.config.migrationTable ||
+                                    DEFAULTS.migrationTable
                             });
                         }
 
@@ -239,9 +255,9 @@ export class Migration {
                         chalk.blue('\nThe following files were skipped:')
                     );
                     notAppliedMigrations.map((m) => {
-                        console.log(`> ${m.name} (${m.msg})\n\n`);
+                        console.log(`> ${m.name} (${m.msg})`);
                     });
-                    // notAppliedMigrations
+                    console.log('\n\n');
                 }
 
                 await this.createDataTypeFile();
@@ -326,14 +342,14 @@ export const readConfigFile = (configFilePath: string) => {
         // make migrationDir absolut, as it should be provided relative to config path in json
         const absolutPath = path.join(
             path.dirname(configFilePath),
-            config.migrationDir
+            config.migrationDir || DEFAULTS.migrationDir
         );
         config['migrationDir'] = absolutPath;
 
         // make typeFile absolut
         const absolutTypeFile = path.join(
             path.dirname(configFilePath),
-            config.typeFile
+            config.typeFile || DEFAULTS.typeFile
         );
         config['typeFile'] = absolutTypeFile;
 
