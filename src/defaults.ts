@@ -4,8 +4,10 @@ export default {
         up: /\/\* BEGIN_UP \*\/([\s\S]+)\/\* END_UP \*\//,
         down: /\/\* BEGIN_DOWN \*\/([\s\S]+)\/\* END_DOWN \*\//
     },
+    migrationDir: './migrations',
     migrationTable: '_migrations',
     databaseSchema: 'public',
+    typeFile: './types.d.ts',
     dataTypeConversion: {
         int4: 'number',
         float4: 'number',
