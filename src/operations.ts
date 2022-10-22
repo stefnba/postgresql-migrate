@@ -250,6 +250,38 @@ export class Migration {
                 return;
             });
     }
+
+    async reset() {
+        const tables = await this.dbQuery.manyOrNone<{ tablename: string }>(
+            queries.ddl.list,
+            {
+                schemaName: 'public'
+            }
+        );
+
+        return this.dbQuery
+            .tx('drop_tables', async (t) => {
+                return Promise.all(
+                    tables.map(async (table) => {
+                        t.none(
+                            'DROP table if exists $<tablename:name> cascade',
+                            {
+                                tablename: table.tablename
+                            }
+                        );
+                        return table.tablename;
+                    })
+                );
+            })
+            .then(async (r) => {
+                console.log(
+                    chalk.white.bgGreen.bold('Database Reset successful')
+                );
+                r.map((table) => {
+                    console.log(`> ${table}`);
+                });
+            });
+    }
 }
 
 /**

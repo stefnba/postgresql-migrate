@@ -12,7 +12,8 @@ export default {
         delete: sqlFile('deleteMigrationRecord.sql')
     },
     ddl: {
-        create: sqlFile('createMigrationTable.sql')
+        create: sqlFile('createMigrationTable.sql'),
+        list: sqlFile('getTablesInSchema.sql')
     },
     types: {
         list: sqlFile('getColumnTypes.sql')

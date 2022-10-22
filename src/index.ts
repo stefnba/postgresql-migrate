@@ -26,7 +26,7 @@ const action = argv._.shift() as ActionType;
 /**
  * VALID COMMANDS
  */
-if (argv.help || !['up', 'down', 'create', 'redo'].includes(action)) {
+if (argv.help || !['up', 'down', 'create', 'redo', 'reset'].includes(action)) {
     yargs.showHelp();
     process.exit(1);
 }
@@ -52,6 +52,10 @@ try {
  * ACTIONS
  */
 (async () => {
+    console.log(
+        chalk.gray('\n--- Running Migrations ---------------------------\n')
+    );
+
     if (action === 'create') {
         const name = argv._[0];
         if (!name || !(typeof name === 'string')) {
@@ -65,9 +69,7 @@ try {
 
     if (action === 'redo') {
         const migration = new Migration(config);
-        console.log(
-            chalk.gray('\n--- Running Migrations ---------------------------')
-        );
+
         await migration.run('down');
         await migration.run('up');
     }
@@ -81,6 +83,11 @@ try {
 
         const migration = new Migration(config);
         await migration.run(action, steps);
+    }
+
+    if (action === 'reset') {
+        const migration = new Migration(config);
+        await migration.reset();
     }
     process.exit();
 })();
