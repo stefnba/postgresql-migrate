@@ -11,7 +11,7 @@ process.on('uncaughtException', (err) => {
 });
 
 const argv = yargs
-    .usage('Usage: $0 [up|down|create] [config]')
+    .usage('Usage: $0 [up|down|create|redo] [config]')
     .option('f', {
         alias: 'config-file',
         describe: 'Path to config file, should be .json',
@@ -26,7 +26,7 @@ const action = argv._.shift() as ActionType;
 /**
  * VALID COMMANDS
  */
-if (argv.help || !['up', 'down', 'create'].includes(action)) {
+if (argv.help || !['up', 'down', 'create', 'redo'].includes(action)) {
     yargs.showHelp();
     process.exit(1);
 }
@@ -61,6 +61,15 @@ try {
             process.exit(1);
         }
         newMigrationFile(name, config);
+    }
+
+    if (action === 'redo') {
+        const migration = new Migration(config);
+        console.log(
+            chalk.gray('\n--- Running Migrations ---------------------------')
+        );
+        await migration.run('down');
+        await migration.run('up');
     }
 
     if (action === 'up' || action === 'down') {

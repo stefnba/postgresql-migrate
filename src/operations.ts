@@ -236,7 +236,7 @@ export class Migration {
                         chalk.blue('\nThe following files were skipped:')
                     );
                     notAppliedMigrations.map((m) => {
-                        console.log(`> ${m.name} (${m.msg})`);
+                        console.log(`> ${m.name} (${m.msg})\n\n`);
                     });
                     // notAppliedMigrations
                 }

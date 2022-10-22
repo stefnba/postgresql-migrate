@@ -22,7 +22,7 @@ export type MigrationFileObj = {
     title: string;
 };
 
-export type ActionType = 'up' | 'down' | 'create';
+export type ActionType = 'up' | 'down' | 'create' | 'redo';
 export type OperationType = 'up' | 'down';
 
 export type MigrationTableModel = {
