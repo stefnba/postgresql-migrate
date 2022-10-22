@@ -51,12 +51,15 @@ export class Migration {
                     );
                 tsList.push(ts);
 
+                const fullpath = path.join(this.config.migrationDir, f);
+
                 migrationFiles.push({
-                    fullpath: path.join(this.config.migrationDir, f),
+                    fullpath,
                     name: f,
                     ts,
                     title,
-                    applied: appliedMigrations.includes(f)
+                    applied: appliedMigrations.includes(f),
+                    sql: this.readMigrationFile(fullpath)
                 });
             }
         });
@@ -78,7 +81,7 @@ export class Migration {
             DEFAULTS.templateDirectionMarkers[this.direction]
         );
         const query = m?.[1].replace(/(?:\r\n|\r|\n)/g, '');
-        return query;
+        return (query || '').trim();
     }
 
     /**
@@ -172,14 +175,17 @@ export class Migration {
         if (this.direction === 'up') {
             // remove all applied ones
             migrationsToRun = migrationsToRun.filter((m) => !m.applied);
-            // apply only n steps
+            // apply only n steps, only non-empty files should be used
             if (steps) {
-                migrationsToRun = migrationsToRun.slice(0, steps);
+                migrationsToRun = migrationsToRun
+                    .filter((m) => m.sql !== '')
+                    .slice(0, steps);
             }
         }
         if (this.direction === 'down' && steps) {
+            // for steps down are only applied migration files relevant and those that contain sql, i.e. are not empty
             migrationsToRun = migrationsToRun
-                .filter((m) => m.applied)
+                .filter((m) => m.applied && m.sql !== '')
                 .slice(-steps);
         }
 
@@ -187,8 +193,7 @@ export class Migration {
             .tx('run_migrations', async (t) => {
                 return Promise.all(
                     migrationsToRun.map(async (m) => {
-                        const sql = this.readMigrationFile(m?.fullpath);
-                        if (!sql || sql.trim() == '') {
+                        if (m.sql === '') {
                             return {
                                 name: m.name,
                                 success: false,
@@ -197,7 +202,7 @@ export class Migration {
                         }
 
                         // execute migration
-                        await t.none(sql);
+                        await t.none(m.sql);
 
                         // record migration in _migrations table
                         if (this.direction === 'up') {
@@ -233,7 +238,9 @@ export class Migration {
 
                 if (appliedMigrations.length === 0) {
                     console.log(
-                        chalk.white.bgYellow.bold('No Migrations applied')
+                        chalk.white.bgYellow.bold(
+                            `No Migrations applied [${direction.toUpperCase()}]`
+                        )
                     );
                 }
 
@@ -314,18 +321,19 @@ export class Migration {
  * @param name
  */
 export const newMigrationFile = (name: string, config: ConfigObj) => {
-    // todo replace chars in name string
-    console.log(DEFAULTS.templateFile);
-    console.log(path.join(path.dirname(__dirname), DEFAULTS.templateFile));
     const template = readFileSync(
         path.join(path.dirname(__dirname), DEFAULTS.templateFile),
         { encoding: 'utf-8' }
     );
 
-    const filename = `${dayjs().valueOf()}_${name}.sql`;
-    // const filename = `${dayjs().format('YYYYMMDD-HHmmssSSS')}_${name}.sql`;
+    const filename = `${dayjs().valueOf()}_${name.replace(
+        /_|\s|\.|\\,/g,
+        '-'
+    )}.sql`;
     const fullpath = path.join(config.migrationDir, filename);
     writeFileSync(fullpath, template, { encoding: 'utf-8' });
+
+    console.log(chalk.blue(`${filename} created`));
 };
 
 /**
