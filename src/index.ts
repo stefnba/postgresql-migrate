@@ -3,6 +3,7 @@ import yargs from 'yargs';
 import chalk from 'chalk';
 
 import { Migration, newMigrationFile, readConfigFile } from './operations';
+import DEFAULTS from './defaults';
 import type { ActionType } from './types';
 
 process.on('uncaughtException', (err) => {
@@ -11,7 +12,7 @@ process.on('uncaughtException', (err) => {
 });
 
 const argv = yargs
-    .usage('Usage: $0 [up|down|create|redo] [config]')
+    .usage('Usage: $0 [up|down|create|redo|reset] [config]')
     .option('f', {
         alias: 'config-file',
         describe: 'Path to config file, should be .json',
@@ -26,7 +27,7 @@ const action = argv._.shift() as ActionType;
 /**
  * VALID COMMANDS
  */
-if (argv.help || !['up', 'down', 'create', 'redo', 'reset'].includes(action)) {
+if (argv.help || !DEFAULTS.commands.includes(action)) {
     yargs.showHelp();
     process.exit(1);
 }
@@ -52,10 +53,6 @@ try {
  * ACTIONS
  */
 (async () => {
-    console.log(
-        chalk.gray('\n--- Running Migrations ---------------------------\n')
-    );
-
     if (action === 'create') {
         const name = argv._[0];
         if (!name || !(typeof name === 'string')) {
@@ -65,29 +62,35 @@ try {
             process.exit(1);
         }
         newMigrationFile(name, config);
+        return;
     }
 
-    if (action === 'redo') {
-        const migration = new Migration(config);
-
-        await migration.run('down');
-        await migration.run('up');
-    }
-
-    if (action === 'up' || action === 'down') {
-        const steps = (argv._[0] as number) || null;
-        if (steps && !Number.isInteger(steps)) {
-            console.error(chalk.red('Steps must be an integer!'));
-            process.exit(1);
-        }
-
-        const migration = new Migration(config);
-        await migration.run(action, steps);
-    }
+    console.log(
+        chalk.gray('\n--- Running Migrations ---------------------------\n')
+    );
 
     if (action === 'reset') {
         const migration = new Migration(config);
         await migration.reset();
+        process.exit();
+        return;
+    }
+
+    const steps = (argv._[0] as number) || null;
+    if (steps && !Number.isInteger(steps)) {
+        console.error(chalk.red('Steps must be an integer!'));
+        process.exit(1);
+    }
+
+    if (action === 'redo') {
+        const migration = new Migration(config);
+        await migration.run('down', steps);
+        await migration.run('up', steps);
+    }
+
+    if (action === 'up' || action === 'down') {
+        const migration = new Migration(config);
+        await migration.run(action, steps);
     }
     process.exit();
 })();

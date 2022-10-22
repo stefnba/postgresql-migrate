@@ -1,6 +1,6 @@
-import dataTypeConversion from './defaults';
+import DEFAULTS from './defaults';
 
-// const { dataTypeConversion } = dataTypeConversion;
+// const commands = DEFAULTS.commands as const
 
 export type ConfigObj = {
     migrationDir: string;
@@ -22,9 +22,10 @@ export type MigrationFileObj = {
     ts: number;
     title: string;
     applied: boolean;
+    sql: string;
 };
 
-export type ActionType = 'up' | 'down' | 'create' | 'redo' | 'reset';
+export type ActionType = typeof DEFAULTS.commands[number];
 export type OperationType = 'up' | 'down';
 
 export type MigrationTableModel = {
@@ -39,7 +40,7 @@ export type ColumnTypesModel = {
     tableName: string;
     columns: Array<{
         columnName: string;
-        dataType: keyof typeof dataTypeConversion.dataTypeConversion;
+        dataType: keyof typeof DEFAULTS.dataTypeConversion;
         isNullable: 'YES' | 'NO';
     }>;
 };

@@ -4,6 +4,7 @@ export default {
         up: /\/\* BEGIN_UP \*\/([\s\S]+)\/\* END_UP \*\//,
         down: /\/\* BEGIN_DOWN \*\/([\s\S]+)\/\* END_DOWN \*\//
     },
+    commands: ['up', 'down', 'create', 'redo', 'reset'] as const,
     migrationDir: './migrations',
     migrationTable: '_migrations',
     databaseSchema: 'public',
