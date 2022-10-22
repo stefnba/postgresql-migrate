@@ -13,7 +13,8 @@ export default {
     },
     ddl: {
         create: sqlFile('createMigrationTable.sql'),
-        list: sqlFile('getTablesInSchema.sql')
+        list: sqlFile('getTablesInSchema.sql'),
+        drop: sqlFile('deleteTables.sql')
     },
     types: {
         list: sqlFile('getColumnTypes.sql')

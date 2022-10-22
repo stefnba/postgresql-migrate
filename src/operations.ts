@@ -51,8 +51,6 @@ export class Migration {
             }
         });
 
-        // todo sort files by date
-
         //
         return migrationFiles;
     }
@@ -60,7 +58,6 @@ export class Migration {
     /**
      *
      * @param path path to migration file
-     * @returns
      */
     private readMigrationFile(path: string) {
         if (!this.direction)
@@ -75,6 +72,9 @@ export class Migration {
         return query;
     }
 
+    /**
+     * Lists records in migration table.
+     */
     private async listAppliedMigrations() {
         const appliedMigrations =
             await this.dbQuery.manyOrNone<MigrationTableModel>(
@@ -87,11 +87,15 @@ export class Migration {
         return appliedMigrations.map((m) => m.filename);
     }
 
+    /**
+     * Queries PostgreSQL tables and columns used in your application.
+     */
     private async listDataTypes() {
         const columns = await this.dbQuery.manyOrNone<ColumnTypesModel>(
             queries.types.list,
             {
-                schemaName: 'public',
+                schemaName:
+                    this.config.databaseSchema || DEFAULTS.databaseSchema,
                 migrationTable: DEFAULTS.migrationTable
             }
         );
@@ -139,7 +143,6 @@ export class Migration {
      * Executues migration against database
      * @param direction upwards or down
      * @param steps how many migration files to run
-     * @returns
      */
     async run(direction: OperationType = 'up', steps: number | null = null) {
         this.direction = direction;
@@ -251,25 +254,31 @@ export class Migration {
             });
     }
 
+    /**
+     * Drops all tables in schema.
+     */
     async reset() {
         const tables = await this.dbQuery.manyOrNone<{ tablename: string }>(
             queries.ddl.list,
             {
-                schemaName: 'public'
+                schemaName:
+                    this.config.databaseSchema || DEFAULTS.databaseSchema
             }
         );
+
+        if (tables.length === 0) {
+            console.log(chalk.bgWhite.bold('No tables exists'));
+            return;
+        }
 
         return this.dbQuery
             .tx('drop_tables', async (t) => {
                 return Promise.all(
                     tables.map(async (table) => {
-                        t.none(
-                            'DROP table if exists $<tablename:name> cascade',
-                            {
-                                tablename: table.tablename
-                            }
-                        );
-                        return table.tablename;
+                        t.none(queries.ddl.drop, {
+                            tablename: table?.tablename
+                        });
+                        return table?.tablename;
                     })
                 );
             })
