@@ -8,6 +8,7 @@
         "clean": "rm -rf lib",
         "build": "npm run clean && tsc && npm run copy",
         "copy": "copyfiles -u 1 \"src/db/sql/*.sql\" \"lib\"",
+        "prepack": "npm run build",
         "test": "mocha",
         "testN": "mocha --require ts-node/register test/**/*.spec.ts"
     },
