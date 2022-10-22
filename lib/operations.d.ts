@@ -14,7 +14,7 @@ export declare class Migration {
      */
     private readMigrationFile;
     /**
-     * Lists records in migration table.
+     * Lists filenames in migration table that have been applied.
      */
     private listAppliedMigrations;
     /**
