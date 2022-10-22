@@ -1,6 +1,6 @@
 {
     "name": "postgresql-migrate",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "This is a lightweight package for migration tool PostgreSQL with Node.",
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
