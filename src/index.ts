@@ -51,25 +51,27 @@ try {
 /**
  * ACTIONS
  */
-if (action === 'create') {
-    const name = argv._[0];
-    if (!name || !(typeof name === 'string')) {
-        console.error(chalk.red('Must provide a name for the migration file!'));
-        process.exit(1);
-    }
-    newMigrationFile(name, config);
-    process.exit(1);
-}
-
-if (action === 'up' || action === 'down') {
-    const steps = (argv._[0] as number) || null;
-    if (steps && !Number.isInteger(steps)) {
-        console.error(chalk.red('Steps must be an integer!'));
-        process.exit(1);
+(async () => {
+    if (action === 'create') {
+        const name = argv._[0];
+        if (!name || !(typeof name === 'string')) {
+            console.error(
+                chalk.red('Must provide a name for the migration file!')
+            );
+            process.exit(1);
+        }
+        newMigrationFile(name, config);
     }
 
-    const migration = new Migration(config);
-    migration.run(action, steps);
+    if (action === 'up' || action === 'down') {
+        const steps = (argv._[0] as number) || null;
+        if (steps && !Number.isInteger(steps)) {
+            console.error(chalk.red('Steps must be an integer!'));
+            process.exit(1);
+        }
 
-    // process.exit(1);
-}
+        const migration = new Migration(config);
+        await migration.run(action, steps);
+    }
+    process.exit();
+})();

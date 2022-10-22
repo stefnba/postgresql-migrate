@@ -109,7 +109,6 @@ export class Migration {
             .map((col) => {
                 const { tableName, columns } = col;
                 const colTypes = columns.map((c) => {
-                    console.log(c.dataType, c.isNullable);
                     return `${c.columnName}${
                         c.isNullable === 'YES' ? '?' : ''
                     }: ${
@@ -240,8 +239,6 @@ export const newMigrationFile = (name: string, config: ConfigObj) => {
  * @returns config object
  */
 export const readConfigFile = (configFilePath: string) => {
-    console.log('test', process.env.TEST);
-
     try {
         const configFile = readFileSync(configFilePath, { encoding: 'utf8' });
         const config = JSON.parse(configFile) as ConfigObj;
