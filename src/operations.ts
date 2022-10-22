@@ -164,10 +164,20 @@ export class Migration {
                             appliedMigrations.includes(m.name) &&
                             this.direction === 'up'
                         )
-                            return;
+                            return {
+                                name: m.name,
+                                success: false,
+                                msg: 'Already applied'
+                            };
 
                         const sql = this.readMigrationFile(m?.fullpath);
-                        if (!sql || sql.trim() == '') return;
+                        if (!sql || sql.trim() == '') {
+                            return {
+                                name: m.name,
+                                success: false,
+                                msg: 'Empty migration file'
+                            };
+                        }
 
                         // execute migration
                         await t.none(sql);
@@ -186,22 +196,50 @@ export class Migration {
                                     DEFAULTS.migrationTable
                                 )
                             );
-                            console.info(`> UP executed: ${m.name}`);
                         }
                         if (this.direction === 'down') {
                             await t.none(queries.dml.delete, {
                                 filename: m.name,
                                 table: DEFAULTS.migrationTable
                             });
-                            console.info(`> DOWN executed: ${m.name}`);
                         }
 
-                        return;
+                        return { name: m.name, success: true };
                     })
                 );
             })
-            .then(async () => {
-                console.log(chalk.white.bgGreen.bold('Migration successful'));
+            .then(async (r) => {
+                const appliedMigrations = r.filter((m) => m.success);
+                const notAppliedMigrations = r.filter((m) => !m.success);
+
+                if (appliedMigrations.length === 0) {
+                    console.log(
+                        chalk.white.bgYellow.bold('No Migrations applied')
+                    );
+                }
+
+                if (appliedMigrations.length > 0) {
+                    console.log(
+                        chalk.white.bgGreen.bold(
+                            `Migration [${direction.toUpperCase()}] successful`
+                        )
+                    );
+                    console.log(
+                        `${appliedMigrations
+                            .map((m) => `> ${m.name}`)
+                            .join('\n')}`
+                    );
+                }
+
+                if (notAppliedMigrations.length > 0) {
+                    console.log(
+                        chalk.blue('\nThe following files were skipped:')
+                    );
+                    notAppliedMigrations.map((m) => {
+                        console.log(`> ${m.name} (${m.msg})`);
+                    });
+                    // notAppliedMigrations
+                }
 
                 await this.createDataTypeFile();
                 return;
