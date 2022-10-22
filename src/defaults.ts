@@ -5,6 +5,7 @@ export default {
         down: /\/\* BEGIN_DOWN \*\/([\s\S]+)\/\* END_DOWN \*\//
     },
     migrationTable: '_migrations',
+    databaseSchema: 'public',
     dataTypeConversion: {
         int4: 'number',
         float4: 'number',

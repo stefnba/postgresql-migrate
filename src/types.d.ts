@@ -13,6 +13,7 @@ export type ConfigObj = {
         password: string;
         database: string;
     };
+    databaseSchema: string;
 };
 
 export type MigrationFileObj = {
