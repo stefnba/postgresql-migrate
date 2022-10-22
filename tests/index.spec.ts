@@ -8,7 +8,7 @@ describe('Config File', () => {
         assert.isFunction(readConfigFile);
     });
     it('should return config object', () => {
-        const config = readConfigFile('./app/config.json');
+        const config = readConfigFile('tests/app/config.json');
         assert.isObject(config);
     });
 });
