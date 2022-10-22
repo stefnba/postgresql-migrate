@@ -11,11 +11,35 @@ export declare class Migration {
     /**
      *
      * @param path path to migration file
-     * @returns
      */
     private readMigrationFile;
+    /**
+     * Lists records in migration table.
+     */
     private listAppliedMigrations;
+    /**
+     * Queries PostgreSQL tables and columns used in your application.
+     */
+    private listDataTypes;
+    /**
+     * Converts postgres data types to data types for TypeScript
+     * @returns types string for TypeScript
+     */
+    private parseDataTypes;
+    /**
+     * Creates types.d.ts file with data types from database
+     */
+    private createDataTypeFile;
+    /**
+     * Executues migration against database
+     * @param direction upwards or down
+     * @param steps how many migration files to run
+     */
     run(direction?: OperationType, steps?: number | null): Promise<void>;
+    /**
+     * Drops all tables in schema.
+     */
+    reset(): Promise<void>;
 }
 /**
  * Creates new migration file in migration dir

@@ -6,6 +6,11 @@ declare const _default: {
     };
     ddl: {
         create: QueryFile;
+        list: QueryFile;
+        drop: QueryFile;
+    };
+    types: {
+        list: QueryFile;
     };
 };
 export default _default;
