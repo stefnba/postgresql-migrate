@@ -85,7 +85,7 @@ export class Migration {
     }
 
     /**
-     * Lists records in migration table.
+     * Lists filenames in migration table that have been applied.
      */
     private async listAppliedMigrations() {
         const appliedMigrations =
@@ -165,10 +165,10 @@ export class Migration {
         });
 
         // list all migration that have been applied, from db table
-        const appliedMigrations = await this.listAppliedMigrations();
+        const appliedMigrationFiles = await this.listAppliedMigrations();
 
         // get all migration files
-        const migrationFiles = this.listMigrationsFiles(appliedMigrations);
+        const migrationFiles = this.listMigrationsFiles(appliedMigrationFiles);
 
         // filter which migration files to apply
         let migrationsToRun = migrationFiles;
@@ -236,10 +236,18 @@ export class Migration {
                 const appliedMigrations = r.filter((m) => m.success);
                 const notAppliedMigrations = r.filter((m) => !m.success);
 
+                if (appliedMigrationFiles.length > 0 && direction === 'up') {
+                    console.log(
+                        chalk.blue(
+                            `Current migration contains ${appliedMigrationFiles.length} files.\n`
+                        )
+                    );
+                }
+
                 if (appliedMigrations.length === 0) {
                     console.log(
                         chalk.white.bgYellow.bold(
-                            `No Migrations applied [${direction.toUpperCase()}]`
+                            `No new migrations files applied [${direction.toUpperCase()}]`
                         )
                     );
                 }
@@ -264,8 +272,9 @@ export class Migration {
                     notAppliedMigrations.map((m) => {
                         console.log(`> ${m.name} (${m.msg})`);
                     });
-                    console.log('\n\n');
                 }
+
+                console.log('\n\n');
 
                 await this.createDataTypeFile();
                 return;
