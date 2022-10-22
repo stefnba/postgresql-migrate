@@ -10,7 +10,7 @@
         "copy": "copyfiles -u 1 \"src/db/sql/*.sql\" \"lib\"",
         "prepack": "npm run build",
         "test": "mocha",
-        "testN": "mocha --require ts-node/register test/**/*.spec.ts"
+        "test:migrate": "ts-node src/index.ts -f tests/app/config.json"
     },
     "bin": "lib/index.js",
     "repository": {

@@ -8,7 +8,27 @@ describe('Config File', () => {
         assert.isFunction(readConfigFile);
     });
     it('should return config object', () => {
-        const config = readConfigFile('app/config.json');
+        const config = readConfigFile('tests/app/config.json');
+        assert.isObject(config);
+    });
+});
+
+describe('Create new Migration File', () => {
+    it('should be an object', () => {
+        assert.isFunction(readConfigFile);
+    });
+    it('should return config object', () => {
+        const config = readConfigFile('tests/app/config.json');
+        assert.isObject(config);
+    });
+});
+
+describe('Migrate Command', () => {
+    it('should be an object', () => {
+        assert.isFunction(readConfigFile);
+    });
+    it('should return config object', () => {
+        const config = readConfigFile('tests/app/config.json');
         assert.isObject(config);
     });
 });
