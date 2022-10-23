@@ -54,5 +54,23 @@ DROP TABLE IF EXISTS "Users" CASCADE;
 
 ```bash
 postgresql-migrate -f "path-to-config-json" up
+```
 
+#### Add migration command to `package.json`
+
+To simplify running commands, it is recommended to add the following command to your `package.json`.
+
+```json
+{
+    "scripts": {
+       ...
+        "migrate": "postgresql-migrate -f 'path-to-config-json'"
+    }
+}
+```
+
+Now you can use any command simply with
+
+```bash
+npm run migrate create|up|down|redo|reset
 ```
