@@ -63,7 +63,6 @@ To simplify running commands, it is recommended to add the following command to 
 ```json
 {
     "scripts": {
-       ...
         "migrate": "postgresql-migrate -f 'path-to-config-json'"
     }
 }
