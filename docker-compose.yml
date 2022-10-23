@@ -6,11 +6,11 @@ services:
         restart: always
         container_name: DB_POSTGRESQL_MIGRATE
         env_file:
-            - ./.env
+            - .env
         environment:
             - POSTGRES_PASSWORD=${DB_PASSWORD}
         ports:
             - '${DB_PORT}:5432'
         volumes:
             # Run setup scripts
-            - ./db/scripts:/docker-entrypoint-initdb.d/
+            - ./tests/app/db/scripts:/docker-entrypoint-initdb.d/
