@@ -1,7 +1,7 @@
 {
     "name": "postgresql-migrate",
     "version": "1.0.5",
-    "description": "This is a simple CLI migration tool for PostgreSQL and Node.js. Migrations are written in raw SQL. At the end of a successful migration, it generates automatically a TypeScript types file for all tables and columns in the database.",
+    "description": "Simple CLI migration tool for PostgreSQL and Node.js with migration files written in raw SQL. TypeScript types files for all tables and columns in the database are automatically created.",
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
     "scripts": {
