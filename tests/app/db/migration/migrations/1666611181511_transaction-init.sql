@@ -1,4 +1,4 @@
-/* BEGIN_UP */
+/* UP */
 CREATE TABLE IF NOT EXISTS "Transactions" (
     "id" serial4 PRIMARY KEY,
     "date" timestamp NOT NULL,
@@ -7,9 +7,6 @@ CREATE TABLE IF NOT EXISTS "Transactions" (
 );
 
 
-/* END_UP */
-/* BEGIN_DOWN */
+/* DOWN */
 DROP TABLE IF EXISTS "Transactions" CASCADE;
 
-
-/* END_DOWN */

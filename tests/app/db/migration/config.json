@@ -1,5 +1,5 @@
 {
-    "database": {
+    "connection": {
         "host": "env:DB_HOST",
         "port": "env:DB_PORT",
         "user": "env:DB_USER",
