@@ -132,7 +132,10 @@ export class Migration {
         migrationFiles: MigrationFileObj[],
         appliedMigrations: MigrationTableModel[]
     ) {
-        const warnings = appliedMigrations
+        const warningsFileChange: string[] = [];
+        const warningsNoFile: string[] = [];
+
+        appliedMigrations
             .map((m) => {
                 // applied db migration not as file
                 if (!migrationFiles.map((f) => f.hash).includes(m.hash)) {
@@ -140,19 +143,38 @@ export class Migration {
                     if (
                         migrationFiles.map((f) => f.name).includes(m.filename)
                     ) {
-                        return `A migration file with the name ${m.filename} has already been applied but the content has changed.`;
+                        warningsFileChange.push(m.filename);
                     } else {
-                        return `The following migration step has been applied but doesn't exist as a migration file: ${m.filename}.`;
+                        warningsNoFile.push(m.filename);
                     }
                 }
                 return null;
             })
             .filter((w) => w);
 
-        if (warnings.length > 0) {
-            console.log(chalk.bold('WARNING:'));
-            warnings.forEach((w) => {
-                console.log('>', w);
+        if (warningsFileChange.length > 0) {
+            console.log(
+                chalk.blue(
+                    `${chalk.bold(
+                        '[WARNING]'
+                    )} The following files have already been applied but the file content seems to have changed:`
+                )
+            );
+            warningsFileChange.map((f) => {
+                console.log(`- ${f}`);
+            });
+            console.log('\n');
+        }
+        if (warningsNoFile.length > 0) {
+            console.log(
+                chalk.blue(
+                    `${chalk.bold(
+                        '[WARNING]'
+                    )} The following migration steps have been applied but don't exist as a migration file:`
+                )
+            );
+            warningsNoFile.map((f) => {
+                console.log(`- ${f}`);
             });
             console.log('\n');
         }
@@ -412,25 +434,27 @@ export class Migration {
      * Displays status of current migrations
      */
     async status(showDetails = true) {
-        console.log(chalk.bgWhite('Migration Status:'));
+        console.log(chalk.bgWhite('Migration Status:\n'));
 
         const appliedMigrations = await this.listAppliedMigrations();
-        console.log(`> ${appliedMigrations.length} steps are applied`);
+        console.log(
+            chalk.blue(`Steps already applied: ${appliedMigrations.length} `)
+        );
 
         if (showDetails && appliedMigrations.length > 0) {
             appliedMigrations.forEach((m) => {
-                console.log(`  - ${m.filename}`);
+                console.log(`- ${m.filename}`);
             });
         }
 
         const migrationFiles = this.listMigrationsFiles(
             appliedMigrations
         ).filter((f) => !f.applied);
-        console.log(`\n> ${migrationFiles.length} files are pending`);
+        console.log(chalk.blue(`\nFiles pending: ${migrationFiles.length}`));
 
         if (showDetails && migrationFiles.length > 0) {
             migrationFiles.forEach((f) => {
-                console.log(`  - ${f.name}`);
+                console.log(`- ${f.name}`);
             });
         }
 
@@ -500,12 +524,6 @@ export const readConfigFile = (
                 [key]: v
             };
         }, {}) as ConfigObject['connection'];
-
-        console.log(
-            configRaw?.typesFile?.startsWith('/')
-                ? configRaw?.typesFile?.slice(1)
-                : path.join(rootDirPath, configRaw?.typesFile || '')
-        );
 
         const config: ConfigObject = {
             connection: connectionWithEnvVars,
