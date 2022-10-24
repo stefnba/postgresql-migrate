@@ -40,7 +40,7 @@ export class Migration {
     /**
      * Reads all files and selects .sql ones in migration dir
      */
-    private listMigrationsFiles(appliedMigrations: string[]) {
+    private listMigrationsFiles(appliedMigrations: MigrationTableModel[]) {
         const dirFiles = readdirSync(this.config.migrationsDir);
 
         const migrationFiles: MigrationFileObj[] = [];
@@ -61,13 +61,24 @@ export class Migration {
 
                 const fullpath = path.join(this.config.migrationsDir, f);
 
+                const fileContent = this.readMigrationFile(fullpath);
+                const hash = this.hashSql(fileContent.content);
+
+                // if (appliedMigrations.map((f) => f.hash).includes(hash)) {
+                //     console.log('changed', f);
+                // }
+
                 migrationFiles.push({
                     fullpath,
                     name: f,
                     ts,
                     title,
-                    applied: appliedMigrations.includes(f),
-                    sql: this.readMigrationFile(fullpath)
+                    applied: appliedMigrations
+                        .map((f) => f.filename)
+                        .includes(f),
+                    sql: fileContent[this.direction],
+                    content: fileContent.content,
+                    hash
                 });
             }
         });
@@ -85,9 +96,19 @@ export class Migration {
 
         const content = readFileSync(path, { encoding: 'utf-8' });
 
-        const m = content.match(DEFAULTS.templates.markers[this.direction]);
-        const query = m?.[1].replace(/(?:\r\n|\r|\n)/g, '');
-        return (query || '').trim();
+        const replacString = (s: string | undefined) => {
+            if (!s) return '';
+            return s.replace(/(?:\r\n|\r|\n)/g, '').trim();
+        };
+
+        const downMatch = content.match(DEFAULTS.templates.markers.down);
+        const upMatch = content.match(DEFAULTS.templates.markers.up);
+
+        return {
+            down: replacString(downMatch?.[1]) || '',
+            up: replacString(upMatch?.[1]) || '',
+            content: content
+        };
     }
 
     /**
@@ -102,7 +123,7 @@ export class Migration {
                 }
             );
 
-        return appliedMigrations.map((m) => m.filename);
+        return appliedMigrations;
     }
 
     /**
@@ -172,10 +193,19 @@ export class Migration {
         });
 
         // list all migration that have been applied, from db table
-        const appliedMigrationFiles = await this.listAppliedMigrations();
+        const appliedMigrations = await this.listAppliedMigrations();
+
+        if (direction === 'down' && appliedMigrations.length === 0) {
+            console.log(
+                chalk.white.bgYellow(
+                    '[DOWN] not possible. No migrations have been applied.'
+                )
+            );
+            return;
+        }
 
         // get all migration files
-        const migrationFiles = this.listMigrationsFiles(appliedMigrationFiles);
+        const migrationFiles = this.listMigrationsFiles(appliedMigrations);
 
         // filter which migration files to apply
         let migrationsToRun = migrationFiles;
@@ -195,6 +225,8 @@ export class Migration {
                 .filter((m) => m.applied && m.sql !== '')
                 .slice(-steps);
         }
+
+        // check if migrations have been applied for which no file exists
 
         return this.dbQuery
             .tx('run_migrations', async (t) => {
@@ -219,8 +251,8 @@ export class Migration {
                                         filename: m.name,
                                         title: m.title,
                                         createdAt: dayjs(m.ts).toISOString(),
-                                        sql: m.sql,
-                                        hash: this.hashSql(m.sql)
+                                        content: m.content,
+                                        hash: m.hash
                                     },
                                     null,
                                     this.config.database.migrationsTable
@@ -239,18 +271,18 @@ export class Migration {
                 );
             })
             .then(async (r) => {
-                const appliedMigrations = r.filter((m) => m.success);
-                const notAppliedMigrations = r.filter((m) => !m.success);
+                const appliedM = r.filter((m) => m.success);
+                const notAppliedM = r.filter((m) => !m.success);
 
-                if (appliedMigrationFiles.length > 0 && direction === 'up') {
+                if (appliedMigrations.length > 0 && direction === 'up') {
                     console.log(
                         chalk.blue(
-                            `Current migration contains ${appliedMigrationFiles.length} files.\n`
+                            `Current migration contains ${appliedMigrations.length} files.\n`
                         )
                     );
                 }
 
-                if (appliedMigrations.length === 0) {
+                if (appliedM.length === 0) {
                     console.log(
                         chalk.white.bgYellow.bold(
                             `No new migrations files applied [${direction.toUpperCase()}]`
@@ -258,24 +290,22 @@ export class Migration {
                     );
                 }
 
-                if (appliedMigrations.length > 0) {
+                if (appliedM.length > 0) {
                     console.log(
                         chalk.white.bgGreen.bold(
                             `Migration [${direction.toUpperCase()}] successful`
                         )
                     );
                     console.log(
-                        `${appliedMigrations
-                            .map((m) => `> ${m.name}`)
-                            .join('\n')}`
+                        `${appliedM.map((m) => `> ${m.name}`).join('\n')}`
                     );
                 }
 
-                if (notAppliedMigrations.length > 0) {
+                if (notAppliedM.length > 0) {
                     console.log(
                         chalk.blue('\nThe following files were skipped:')
                     );
-                    notAppliedMigrations.map((m) => {
+                    notAppliedM.map((m) => {
                         console.log(`> ${m.name} (${m.msg})`);
                     });
                 }
@@ -292,6 +322,11 @@ export class Migration {
             });
     }
 
+    /**
+     * Hashes sql query file content for checking if changes were made
+     * @param sql query file content
+     * @returns
+     */
     private hashSql(sql: string) {
         return (
             'sha256-' +
@@ -414,7 +449,6 @@ export const readConfigFile = (
                 configRaw?.migrationsDir ||
                 path.join(rootDirPath, DEFAULTS.migrationsDir)
         };
-        console.log(config);
         return config;
     } catch (e) {
         console.log(chalk.red('Config file read error!'));

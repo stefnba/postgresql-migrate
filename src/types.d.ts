@@ -34,6 +34,8 @@ export type MigrationFileObj = {
     title: string;
     applied: boolean;
     sql: string;
+    content: string;
+    hash: string;
 };
 
 export type ActionType = typeof DEFAULTS.commands[number];
@@ -45,7 +47,7 @@ export type MigrationTableModel = {
     title: string;
     createdAt: Date;
     runAt: Date;
-    sql: string;
+    content: string;
     hash: string;
 };
 

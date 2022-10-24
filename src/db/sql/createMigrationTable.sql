@@ -8,4 +8,4 @@ CREATE TABLE IF NOT EXISTS $<table:name> (
     "runAt" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "title" varchar NOT NULL,
     "hash" varchar,
-    "sql" text)
+    "content" text)
