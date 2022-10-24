@@ -38,7 +38,7 @@ export class Migration {
     }
 
     /**
-     * Reads all files and selects .sql ones in migration dir
+     * Reads all files and returns .sql files from migration dir with additional infos
      */
     private listMigrationsFiles(appliedMigrations: MigrationTableModel[]) {
         const dirFiles = readdirSync(this.config.migrationsDir);
@@ -63,10 +63,6 @@ export class Migration {
 
                 const fileContent = this.readMigrationFile(fullpath);
                 const hash = this.hashSql(fileContent.content);
-
-                // if (appliedMigrations.map((f) => f.hash).includes(hash)) {
-                //     console.log('changed', f);
-                // }
 
                 migrationFiles.push({
                     fullpath,
@@ -122,8 +118,46 @@ export class Migration {
                     table: this.config.database.migrationsTable
                 }
             );
-
         return appliedMigrations;
+    }
+
+    /**
+     * Provides warnings to user in case migration are applied against db but the
+     * content of the migration file has changed (based on hash) or migration file does not exist
+     * @param migrationFiles
+     * @param appliedMigrations
+     * @returns
+     */
+    private async compareFilesWithDbMigrations(
+        migrationFiles: MigrationFileObj[],
+        appliedMigrations: MigrationTableModel[]
+    ) {
+        const warnings = appliedMigrations
+            .map((m) => {
+                // applied db migration not as file
+                if (!migrationFiles.map((f) => f.hash).includes(m.hash)) {
+                    // if same filename exists though
+                    if (
+                        migrationFiles.map((f) => f.name).includes(m.filename)
+                    ) {
+                        return `A migration file with the name ${m.filename} has already been applied but the content has changed.`;
+                    } else {
+                        return `The following migration step has been applied but doesn't exist as a migration file: ${m.filename}.`;
+                    }
+                }
+                return null;
+            })
+            .filter((w) => w);
+
+        if (warnings.length > 0) {
+            console.log(chalk.bold('WARNING:'));
+            warnings.forEach((w) => {
+                console.log('>', w);
+            });
+            console.log('\n');
+        }
+
+        return [];
     }
 
     /**
@@ -195,6 +229,14 @@ export class Migration {
         // list all migration that have been applied, from db table
         const appliedMigrations = await this.listAppliedMigrations();
 
+        if (appliedMigrations.length > 0 && direction === 'up') {
+            console.log(
+                chalk.blue(
+                    `${appliedMigrations.length} migration steps are already applied.\n`
+                )
+            );
+        }
+
         if (direction === 'down' && appliedMigrations.length === 0) {
             console.log(
                 chalk.white.bgYellow(
@@ -227,6 +269,7 @@ export class Migration {
         }
 
         // check if migrations have been applied for which no file exists
+        this.compareFilesWithDbMigrations(migrationFiles, appliedMigrations);
 
         return this.dbQuery
             .tx('run_migrations', async (t) => {
@@ -273,14 +316,6 @@ export class Migration {
             .then(async (r) => {
                 const appliedM = r.filter((m) => m.success);
                 const notAppliedM = r.filter((m) => !m.success);
-
-                if (appliedMigrations.length > 0 && direction === 'up') {
-                    console.log(
-                        chalk.blue(
-                            `Current migration contains ${appliedMigrations.length} files.\n`
-                        )
-                    );
-                }
 
                 if (appliedM.length === 0) {
                     console.log(

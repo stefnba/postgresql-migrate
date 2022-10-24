@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS "User_Users" (
     "email" varchar(255) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS "Auth_Logins" (
+CREATE TABLE "Auth_Logins" (
     "id" serial4 PRIMARY KEY,
     "userId" int NOT NULL REFERENCES "User_Users" (id),
     "logginAt" timestamp,
