@@ -29,7 +29,7 @@ WITH "DataTypes" AS (
         AND "c"."column_name" = "constr"."column_name"
     WHERE
         "c"."table_schema" = $<schemaName>
-        AND "c"."table_name" <> $<migrationTable>
+        AND "c"."table_name" <> $<migrationsTable>
     ORDER BY
         "c"."table_name",
         "c"."ordinal_position"
