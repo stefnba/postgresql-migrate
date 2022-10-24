@@ -12,7 +12,15 @@ export default {
         schema: 'public',
         migrationsTable: '_migrations'
     },
-    commands: ['up', 'down', 'create', 'redo', 'reset', 'setup'] as const,
+    commands: [
+        'up',
+        'down',
+        'create',
+        'redo',
+        'reset',
+        'setup',
+        'status'
+    ] as const,
     migrationsDir: './migrations',
 
     typeFile: './types.d.ts',

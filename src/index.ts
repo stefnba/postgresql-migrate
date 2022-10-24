@@ -11,7 +11,6 @@ import {
 } from './operations';
 import DEFAULTS from './defaults';
 import type { ActionType } from './types';
-import { existsSync } from 'fs';
 
 process.on('uncaughtException', (err) => {
     console.error(err);
@@ -19,7 +18,7 @@ process.on('uncaughtException', (err) => {
 });
 
 const argv = yargs
-    .usage('Usage: $0 [up|down|create|redo|reset|setup] [config]')
+    .usage('Usage: $0 [up|down|create|redo|reset|setup|status] [config]')
     .option('d', {
         alias: 'root-dir',
         describe:
@@ -27,7 +26,6 @@ const argv = yargs
         type: 'string'
     })
     .help()
-    .version()
     .parseSync();
 
 const action = argv._.shift() as ActionType;
@@ -44,7 +42,8 @@ if (argv.help || !DEFAULTS.commands.includes(action)) {
 /**
  * ROOT DIRECTORY AND CONFIG FILE
  */
-const rootDirPath = argv['d'] as string;
+const d = argv['d'] as string;
+const rootDirPath = d.startsWith('/') ? d.slice(1) : d;
 
 if (!rootDirPath) {
     console.error(chalk.red('A root directory must be provided'));
@@ -66,6 +65,12 @@ if (!rootDirPath) {
         rootDirPath
     );
 
+    if (action === 'status') {
+        const migration = new Migration(config);
+        await migration.status();
+        process.exit();
+    }
+
     if (action === 'create') {
         const name = argv._[0];
         if (!name || !(typeof name === 'string')) {
@@ -86,7 +91,6 @@ if (!rootDirPath) {
         const migration = new Migration(config);
         await migration.reset();
         process.exit();
-        return;
     }
 
     const steps = (argv._[0] as number) || null;

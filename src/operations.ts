@@ -226,7 +226,6 @@ export class Migration {
             table: this.config.database.migrationsTable
         });
 
-        // list all migration that have been applied, from db table
         const appliedMigrations = await this.listAppliedMigrations();
 
         if (appliedMigrations.length > 0 && direction === 'up') {
@@ -408,6 +407,37 @@ export class Migration {
                 });
             });
     }
+
+    /**
+     * Displays status of current migrations
+     */
+    async status(showDetails = true) {
+        console.log(chalk.bgWhite('Migration Status:'));
+
+        const appliedMigrations = await this.listAppliedMigrations();
+        console.log(`> ${appliedMigrations.length} steps are applied`);
+
+        if (showDetails && appliedMigrations.length > 0) {
+            appliedMigrations.forEach((m) => {
+                console.log(`  - ${m.filename}`);
+            });
+        }
+
+        const migrationFiles = this.listMigrationsFiles(
+            appliedMigrations
+        ).filter((f) => !f.applied);
+        console.log(`\n> ${migrationFiles.length} files are pending`);
+
+        if (showDetails && migrationFiles.length > 0) {
+            migrationFiles.forEach((f) => {
+                console.log(`  - ${f.name}`);
+            });
+        }
+
+        console.log('\n');
+
+        this.compareFilesWithDbMigrations(migrationFiles, appliedMigrations);
+    }
 }
 
 /**
@@ -471,9 +501,17 @@ export const readConfigFile = (
             };
         }, {}) as ConfigObject['connection'];
 
+        console.log(
+            configRaw?.typesFile?.startsWith('/')
+                ? configRaw?.typesFile?.slice(1)
+                : path.join(rootDirPath, configRaw?.typesFile || '')
+        );
+
         const config: ConfigObject = {
             connection: connectionWithEnvVars,
-            typesFile: configRaw?.typesFile,
+            typesFile: configRaw?.typesFile?.startsWith('/')
+                ? configRaw?.typesFile?.slice(1)
+                : path.join(rootDirPath, configRaw?.typesFile || ''),
             database: {
                 migrationsTable:
                     configRaw?.database?.migrationsTable ||
