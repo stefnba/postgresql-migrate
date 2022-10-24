@@ -1,4 +1,10 @@
-import { readdirSync, readFileSync, writeFileSync } from 'fs';
+import {
+    readdirSync,
+    readFileSync,
+    writeFileSync,
+    existsSync,
+    mkdirSync
+} from 'fs';
 import chalk from 'chalk';
 import path from 'path';
 import dayjs from 'dayjs';
@@ -390,7 +396,42 @@ export const readConfigFile = (configFilePath: string) => {
 
         return config;
     } catch (e) {
+        console.log(chalk.red('Config file read error!'));
         console.log(e);
-        throw new Error('A valid path to a config file must be provided.');
+        process.exit(1);
     }
+};
+
+/**
+ * Creates dir and copies template config.json to it
+ * @param dirPath directory path that holds required files and dirs
+ * @param filename name of config file inside dir
+ */
+export const setupRoot = (
+    dirPath: string,
+    filename: string = DEFAULTS.templates.configFile
+) => {
+    // root folder
+    if (!existsSync(dirPath)) {
+        mkdirSync(dirPath, { recursive: true });
+    }
+
+    const {
+        templates: { dir, configFile },
+        migrationDir
+    } = DEFAULTS;
+
+    // config file
+    const json = readFileSync(path.join(dir, configFile), {
+        encoding: 'utf-8'
+    });
+    writeFileSync(path.join(dirPath, filename), json, { encoding: 'utf-8' });
+
+    // migration dir
+    const migrationDirAbsolut = path.join(dirPath, migrationDir);
+    if (!existsSync(migrationDirAbsolut)) {
+        mkdirSync(migrationDirAbsolut, { recursive: true });
+    }
+
+    console.log(chalk.blue('Migration setup successful'));
 };

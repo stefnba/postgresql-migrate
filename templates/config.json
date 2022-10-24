@@ -1,0 +1,12 @@
+{
+    "migrationsDir": "[OPTIONAL]",
+    "typeFile": "[OPTIONAL]",
+    "databaseConnection": {
+        "host": "host of database [MANDATORY]",
+        "port": "port of database [MANDATORY]",
+        "user": "username [MANDATORY]",
+        "password": "password of user [MANDATORY]",
+        "database": "database to connect to [MANDATORY]"
+    },
+    "databaseSchema": "[OPTIONAL]"
+}
