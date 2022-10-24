@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 import yargs from 'yargs';
 import chalk from 'chalk';
+import path from 'path';
 
-import { Migration, newMigrationFile, readConfigFile } from './operations';
+import {
+    Migration,
+    newMigrationFile,
+    readConfigFile,
+    setupRoot
+} from './operations';
 import DEFAULTS from './defaults';
 import type { ActionType } from './types';
+import { existsSync } from 'fs';
 
 process.on('uncaughtException', (err) => {
     console.error(err);
@@ -12,10 +19,17 @@ process.on('uncaughtException', (err) => {
 });
 
 const argv = yargs
-    .usage('Usage: $0 [up|down|create|redo|reset] [config]')
+    .usage('Usage: $0 [up|down|create|redo|reset|setup] [config]')
     .option('f', {
-        alias: 'config-file',
-        describe: 'Path to config file, should be .json',
+        alias: 'config-file-path',
+        describe:
+            'Name of config file inside root directory, should be a .json file',
+        type: 'string'
+    })
+    .option('d', {
+        alias: 'root-dir',
+        describe:
+            'Path to root directory that contains config file migration directory',
         type: 'string'
     })
     .help()
@@ -26,6 +40,7 @@ const action = argv._.shift() as ActionType;
 
 /**
  * VALID COMMANDS
+ * If none provided, show help and exit
  */
 if (argv.help || !DEFAULTS.commands.includes(action)) {
     yargs.showHelp();
@@ -33,19 +48,19 @@ if (argv.help || !DEFAULTS.commands.includes(action)) {
 }
 
 /**
- * CONFIG FILE
+ * ROOT DIRECTORY AND CONFIG FILE
+ * Must either provide
+ *      - root dir, and optionally name of config file if different than default
+ *      - config file (contains everything else)
  */
-const configFilePath = argv['f'];
-if (!configFilePath || !(typeof configFilePath === 'string')) {
-    console.error(chalk.red('Must provide a path to a config json!'));
-    process.exit(1);
-}
-let config = null;
-try {
-    config = readConfigFile(configFilePath);
-} catch (e) {
-    console.error(chalk.red("Couldn't find config json!"));
-    console.log(e);
+const configFilePath = argv['f'] as string;
+const rootDirPath = argv['d'] as string;
+const configFilename = argv['n'] as string;
+
+if (!(configFilePath || rootDirPath)) {
+    console.error(
+        chalk.red('Either a config-file-path or a root-dir must be provided')
+    );
     process.exit(1);
 }
 
@@ -53,6 +68,38 @@ try {
  * ACTIONS
  */
 (async () => {
+    // no config required
+    if (action == 'setup') {
+        setupRoot(rootDirPath, configFilename);
+        process.exit();
+    }
+
+    let config = null;
+    if (configFilePath) {
+        config = readConfigFile(configFilePath);
+    } else if (rootDirPath) {
+        // dir not exists
+        if (!existsSync(rootDirPath)) {
+            console.error(
+                chalk.red(
+                    'Either a config-file-path or a root-dir must be provided'
+                )
+            );
+            process.exit(1);
+        }
+        {
+            config = readConfigFile(
+                path.join(
+                    rootDirPath,
+                    configFilename || DEFAULTS.templates.configFile
+                ),
+                rootDirPath
+            );
+        }
+    } else {
+        process.exit(1);
+    }
+
     if (action === 'create') {
         const name = argv._[0];
         if (!name || !(typeof name === 'string')) {

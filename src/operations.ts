@@ -6,6 +6,7 @@ import {
     mkdirSync
 } from 'fs';
 import chalk from 'chalk';
+import crypto from 'crypto';
 import path from 'path';
 import dayjs from 'dayjs';
 import dotenv from 'dotenv';
@@ -16,8 +17,9 @@ import type {
     MigrationFileObj,
     OperationType,
     MigrationTableModel,
-    ConfigObj,
-    ColumnTypesModel
+    ColumnTypesModel,
+    ConfigObject,
+    ConfigRawObject
 } from './types';
 import { IDatabase } from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
@@ -25,21 +27,21 @@ import pg from 'pg-promise/typescript/pg-subset';
 dotenv.config();
 
 export class Migration {
-    private config: ConfigObj;
+    private config: ConfigObject;
     private direction: OperationType;
     private dbQuery: IDatabase<Record<string, unknown>, pg.IClient>;
 
-    constructor(config: ConfigObj) {
+    constructor(config: ConfigObject) {
         this.config = config;
         this.direction = 'up';
-        this.dbQuery = pgp(this.config.database);
+        this.dbQuery = pgp(this.config.connection);
     }
 
     /**
      * Reads all files and selects .sql ones in migration dir
      */
     private listMigrationsFiles(appliedMigrations: string[]) {
-        const dirFiles = readdirSync(this.config.migrationDir);
+        const dirFiles = readdirSync(this.config.migrationsDir);
 
         const migrationFiles: MigrationFileObj[] = [];
         const tsList: Array<number> = [];
@@ -57,7 +59,7 @@ export class Migration {
                     );
                 tsList.push(ts);
 
-                const fullpath = path.join(this.config.migrationDir, f);
+                const fullpath = path.join(this.config.migrationsDir, f);
 
                 migrationFiles.push({
                     fullpath,
@@ -83,9 +85,7 @@ export class Migration {
 
         const content = readFileSync(path, { encoding: 'utf-8' });
 
-        const m = content.match(
-            DEFAULTS.templateDirectionMarkers[this.direction]
-        );
+        const m = content.match(DEFAULTS.templates.markers[this.direction]);
         const query = m?.[1].replace(/(?:\r\n|\r|\n)/g, '');
         return (query || '').trim();
     }
@@ -98,7 +98,7 @@ export class Migration {
             await this.dbQuery.manyOrNone<MigrationTableModel>(
                 queries.dml.list,
                 {
-                    table: this.config.migrationTable || DEFAULTS.migrationTable
+                    table: this.config.database.migrationsTable
                 }
             );
 
@@ -112,9 +112,8 @@ export class Migration {
         const columns = await this.dbQuery.manyOrNone<ColumnTypesModel>(
             queries.types.list,
             {
-                schemaName:
-                    this.config.databaseSchema || DEFAULTS.databaseSchema,
-                migrationTable: DEFAULTS.migrationTable
+                schemaName: this.config.database.schema,
+                migrationsTable: this.config.database.migrationsTable
             }
         );
         return columns;
@@ -147,11 +146,13 @@ export class Migration {
     }
 
     /**
-     * Creates types.d.ts file with data types from database
+     * Creates types.d.ts file with data types from database, only when path is provided in config.json
      */
     private async createDataTypeFile() {
+        const { typesFile } = this.config;
+        if (!typesFile) return;
         const dataTypes = await this.parseDataTypes();
-        writeFileSync(this.config.typeFile, dataTypes, {
+        writeFileSync(typesFile, dataTypes, {
             encoding: 'utf8'
         });
         return;
@@ -167,7 +168,7 @@ export class Migration {
 
         // create migration table, if not yet exists
         await this.dbQuery.none(queries.ddl.create, {
-            table: this.config.migrationTable || DEFAULTS.migrationTable
+            table: this.config.database.migrationsTable
         });
 
         // list all migration that have been applied, from db table
@@ -217,20 +218,19 @@ export class Migration {
                                     {
                                         filename: m.name,
                                         title: m.title,
-                                        createdAt: dayjs(m.ts).toISOString()
+                                        createdAt: dayjs(m.ts).toISOString(),
+                                        sql: m.sql,
+                                        hash: this.hashSql(m.sql)
                                     },
                                     null,
-                                    this.config.migrationTable ||
-                                        DEFAULTS.migrationTable
+                                    this.config.database.migrationsTable
                                 )
                             );
                         }
                         if (this.direction === 'down') {
                             await t.none(queries.dml.delete, {
                                 filename: m.name,
-                                table:
-                                    this.config.migrationTable ||
-                                    DEFAULTS.migrationTable
+                                table: this.config.database.migrationsTable
                             });
                         }
 
@@ -292,6 +292,16 @@ export class Migration {
             });
     }
 
+    private hashSql(sql: string) {
+        return (
+            'sha256-' +
+            crypto
+                .createHash('sha256')
+                .update(sql.replace(/\s{2,}|\n/g, ' '))
+                .digest('base64')
+        );
+    }
+
     /**
      * Drops all tables in schema.
      */
@@ -299,8 +309,7 @@ export class Migration {
         const tables = await this.dbQuery.manyOrNone<{ tablename: string }>(
             queries.ddl.list,
             {
-                schemaName:
-                    this.config.databaseSchema || DEFAULTS.databaseSchema
+                schemaName: this.config.database.schema
             }
         );
 
@@ -335,9 +344,13 @@ export class Migration {
  * Creates new migration file in migration dir
  * @param name
  */
-export const newMigrationFile = (name: string, config: ConfigObj) => {
+export const newMigrationFile = (name: string, config: ConfigObject) => {
     const template = readFileSync(
-        path.join(path.dirname(__dirname), DEFAULTS.templateFile),
+        path.join(
+            path.dirname(__dirname),
+            DEFAULTS.templates.dir,
+            DEFAULTS.templates.migrationSql
+        ),
         { encoding: 'utf-8' }
     );
 
@@ -345,7 +358,7 @@ export const newMigrationFile = (name: string, config: ConfigObj) => {
         /_|\s|\.|\\,/g,
         '-'
     )}.sql`;
-    const fullpath = path.join(config.migrationDir, filename);
+    const fullpath = path.join(config.migrationsDir, filename);
     writeFileSync(fullpath, template, { encoding: 'utf-8' });
 
     console.log(chalk.blue(`${filename} created`));
@@ -356,31 +369,25 @@ export const newMigrationFile = (name: string, config: ConfigObj) => {
  * @param configFilePath path to .json file
  * @returns config object
  */
-export const readConfigFile = (configFilePath: string) => {
+export const readConfigFile = (
+    configFilePath: string,
+    rootDirPath = './'
+): ConfigObject => {
     try {
         const configFile = readFileSync(configFilePath, { encoding: 'utf8' });
-        const config = JSON.parse(configFile) as ConfigObj;
+        const configRaw = JSON.parse(configFile) as ConfigRawObject;
 
-        // edit config object
-        // make migrationDir absolut, as it should be provided relative to config path in json
-        const absolutPath = path.join(
-            path.dirname(configFilePath),
-            config.migrationDir || DEFAULTS.migrationDir
-        );
-        config['migrationDir'] = absolutPath;
-
-        // make typeFile absolut
-        const absolutTypeFile = path.join(
-            path.dirname(configFilePath),
-            config.typeFile || DEFAULTS.typeFile
-        );
-        config['typeFile'] = absolutTypeFile;
+        // todo validate json
+        if (!configRaw?.connection) {
+            console.log(chalk.red('Config.json has wrong schema!'));
+            process.exit(1);
+        }
 
         // integrate env variables for nested database
-        const database = config.database;
-        config['database'] = Object.entries(database).reduce((prev, curr) => {
+        const connectionWithEnvVars = Object.entries(
+            configRaw.connection
+        ).reduce((prev, curr) => {
             const [key, value] = curr;
-
             let v = value;
 
             if (typeof value === 'string' && value.startsWith('env:')) {
@@ -392,8 +399,22 @@ export const readConfigFile = (configFilePath: string) => {
                 ...prev,
                 [key]: v
             };
-        }, {}) as ConfigObj['database'];
+        }, {}) as ConfigObject['connection'];
 
+        const config: ConfigObject = {
+            connection: connectionWithEnvVars,
+            typesFile: configRaw?.typesFile,
+            database: {
+                migrationsTable:
+                    configRaw?.database?.migrationsTable ||
+                    DEFAULTS.database.migrationsTable,
+                schema: configRaw?.database?.schema || DEFAULTS.database.schema
+            },
+            migrationsDir:
+                configRaw?.migrationsDir ||
+                path.join(rootDirPath, DEFAULTS.migrationsDir)
+        };
+        console.log(config);
         return config;
     } catch (e) {
         console.log(chalk.red('Config file read error!'));
@@ -418,7 +439,7 @@ export const setupRoot = (
 
     const {
         templates: { dir, configFile },
-        migrationDir
+        migrationsDir
     } = DEFAULTS;
 
     // config file
@@ -428,7 +449,7 @@ export const setupRoot = (
     writeFileSync(path.join(dirPath, filename), json, { encoding: 'utf-8' });
 
     // migration dir
-    const migrationDirAbsolut = path.join(dirPath, migrationDir);
+    const migrationDirAbsolut = path.join(dirPath, migrationsDir);
     if (!existsSync(migrationDirAbsolut)) {
         mkdirSync(migrationDirAbsolut, { recursive: true });
     }

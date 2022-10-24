@@ -6,4 +6,6 @@ CREATE TABLE IF NOT EXISTS $<table:name> (
     "filename" varchar NOT NULL,
     "createdAt" timestamp NOT NULL,
     "runAt" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "title" varchar NOT NULL)
+    "title" varchar NOT NULL,
+    "hash" varchar,
+    "sql" text)

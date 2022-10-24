@@ -1,21 +1,32 @@
 import DEFAULTS from './defaults';
 
-// const commands = DEFAULTS.commands as const
-
-export type ConfigObj = {
-    migrationDir: string;
-    migrationTable: string;
-    typeFile: string;
-    database: {
+/**
+ * Config as read from .json file
+ */
+export type ConfigRawObject = {
+    migrationsDir?: string;
+    typesFile?: string;
+    connection: {
         host: string;
-        port: number;
+        port: number | string;
         user: string;
         password: string;
         database: string;
     };
-    databaseSchema: string;
+    database: { schema?: string; migrationsTable?: string };
 };
 
+export type ConfigObject = Omit<Required<ConfigRawObject>, 'typesFile'> & {
+    typesFile: string | undefined;
+    connection: {
+        port: number;
+    };
+    database: { schema: string; migrationsTable: string };
+};
+
+/**
+ * Read migration file and adds meta info
+ */
 export type MigrationFileObj = {
     fullpath: string;
     name: string;
@@ -34,6 +45,8 @@ export type MigrationTableModel = {
     title: string;
     createdAt: Date;
     runAt: Date;
+    sql: string;
+    hash: string;
 };
 
 export type ColumnTypesModel = {

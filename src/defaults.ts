@@ -1,13 +1,20 @@
 export default {
-    templateFile: 'templates/template.sql',
-    templateDirectionMarkers: {
-        up: /\/\* BEGIN_UP \*\/([\s\S]+)\/\* END_UP \*\//,
-        down: /\/\* BEGIN_DOWN \*\/([\s\S]+)\/\* END_DOWN \*\//
+    templates: {
+        dir: 'templates',
+        configFile: 'config.json',
+        migrationSql: 'template.sql',
+        markers: {
+            up: /\/\*\s*UP\s\*\/([\s\S]+)\/\*\s*DOWN\s\*\//,
+            down: /\/\*\s*DOWN\s\*\/([\s\S]+)/
+        }
     },
-    commands: ['up', 'down', 'create', 'redo', 'reset'] as const,
-    migrationDir: './migrations',
-    migrationTable: '_migrations',
-    databaseSchema: 'public',
+    database: {
+        schema: 'public',
+        migrationsTable: '_migrations'
+    },
+    commands: ['up', 'down', 'create', 'redo', 'reset', 'setup'] as const,
+    migrationsDir: './migrations',
+
     typeFile: './types.d.ts',
     dataTypeConversion: {
         int4: 'number',
