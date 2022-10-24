@@ -20,12 +20,6 @@ process.on('uncaughtException', (err) => {
 
 const argv = yargs
     .usage('Usage: $0 [up|down|create|redo|reset|setup] [config]')
-    .option('f', {
-        alias: 'config-file-path',
-        describe:
-            'Name of config file inside root directory, should be a .json file',
-        type: 'string'
-    })
     .option('d', {
         alias: 'root-dir',
         describe:
@@ -49,18 +43,11 @@ if (argv.help || !DEFAULTS.commands.includes(action)) {
 
 /**
  * ROOT DIRECTORY AND CONFIG FILE
- * Must either provide
- *      - root dir, and optionally name of config file if different than default
- *      - config file (contains everything else)
  */
-const configFilePath = argv['f'] as string;
 const rootDirPath = argv['d'] as string;
-const configFilename = argv['n'] as string;
 
-if (!(configFilePath || rootDirPath)) {
-    console.error(
-        chalk.red('Either a config-file-path or a root-dir must be provided')
-    );
+if (!rootDirPath) {
+    console.error(chalk.red('A root directory must be provided'));
     process.exit(1);
 }
 
@@ -70,35 +57,14 @@ if (!(configFilePath || rootDirPath)) {
 (async () => {
     // no config required
     if (action == 'setup') {
-        setupRoot(rootDirPath, configFilename);
+        setupRoot(rootDirPath);
         process.exit();
     }
 
-    let config = null;
-    if (configFilePath) {
-        config = readConfigFile(configFilePath);
-    } else if (rootDirPath) {
-        // dir not exists
-        if (!existsSync(rootDirPath)) {
-            console.error(
-                chalk.red(
-                    'Either a config-file-path or a root-dir must be provided'
-                )
-            );
-            process.exit(1);
-        }
-        {
-            config = readConfigFile(
-                path.join(
-                    rootDirPath,
-                    configFilename || DEFAULTS.templates.configFile
-                ),
-                rootDirPath
-            );
-        }
-    } else {
-        process.exit(1);
-    }
+    const config = readConfigFile(
+        path.join(rootDirPath, DEFAULTS.templates.configFile),
+        rootDirPath
+    );
 
     if (action === 'create') {
         const name = argv._[0];
