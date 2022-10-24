@@ -5,6 +5,12 @@
         }
     ],
     "settings": {
+        "search.exclude": {
+            "**/node_modules": true,
+            "**/bower_components": true,
+            "**/*.code-search": true,
+            "lib": true
+        },
         "editor.formatOnPaste": false,
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "esbenp.prettier-vscode",
