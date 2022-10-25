@@ -59,3 +59,32 @@ export type ColumnTypesModel = {
         isNullable: 'YES' | 'NO';
     }>;
 };
+
+export type WarningObject = {
+    name: string;
+    hash: string;
+    resource: 'DB' | 'FILE';
+    msg: 'CONTENT_CHANGED' | 'MISSING' | 'DUPLICATE_HASH';
+};
+
+export type ErrorObject = {
+    name: string;
+    hash: string;
+    resource: 'DB' | 'FILE';
+    msg: 'DUPLICATE_TS';
+};
+
+export type TextWithColor = {
+    text: string;
+    color?: 'blue' | 'yellow' | 'red' | 'white' | 'green';
+    bgColor?: 'bgRed' | 'bgGreen' | 'bgYellow';
+};
+export type LoggerHeaderParam = string | TextWithColor;
+export type LoggerMsgParam = string | TextWithColor;
+export type LoggerListParam = string[];
+export type LoggerTypeParam = 'WARNING' | 'ERROR';
+export type LoggerOptionParam = {
+    onlyWithListElements?: boolean;
+    type?: LoggerTypeParam;
+    newLine?: boolean;
+};

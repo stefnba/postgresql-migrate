@@ -83,10 +83,6 @@ if (!rootDirPath) {
         return;
     }
 
-    console.log(
-        chalk.gray('\n--- Running Migrations ---------------------------\n')
-    );
-
     if (action === 'reset') {
         const migration = new Migration(config);
         await migration.reset();

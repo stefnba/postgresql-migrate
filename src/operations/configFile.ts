@@ -13,6 +13,7 @@ dotenv.config();
 /**
  * Reads config json and return config object
  * @param configFilePath path to .json file
+ * @param rootDirPath path to root directory
  * @returns config object
  */
 const readConfigFile = (

@@ -12,10 +12,13 @@ import type {
     OperationType,
     MigrationTableModel,
     ColumnTypesModel,
-    ConfigObject
+    ConfigObject,
+    ErrorObject,
+    WarningObject
 } from '../types';
 import { IDatabase } from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
+import { Logger } from '../utils';
 
 dotenv.config();
 
@@ -23,11 +26,16 @@ export default class Migration {
     private config: ConfigObject;
     private direction: OperationType;
     private dbQuery: IDatabase<Record<string, unknown>, pg.IClient>;
+    private errors: ErrorObject[];
+    private warnings: WarningObject[];
 
     constructor(config: ConfigObject) {
         this.config = config;
         this.direction = 'up';
         this.dbQuery = pgp(this.config.connection);
+
+        this.errors = [];
+        this.warnings = [];
     }
 
     /**
@@ -37,20 +45,12 @@ export default class Migration {
         const dirFiles = readdirSync(this.config.migrationsDir);
 
         const migrationFiles: MigrationFileObj[] = [];
-        const tsList: Array<number> = [];
 
         dirFiles.forEach((f) => {
             if (f.endsWith('.sql')) {
                 // todo check if filename is correct
                 const [ts_, title] = f.split('_');
                 const ts = Number.parseInt(ts_);
-
-                // check that migration files have different ts
-                if (tsList.includes(ts))
-                    throw new Error(
-                        'Multiple migration files have the same timestamp!'
-                    );
-                tsList.push(ts);
 
                 const fullpath = path.join(this.config.migrationsDir, f);
 
@@ -119,93 +119,151 @@ export default class Migration {
      * content of the migration file has changed (based on hash) or migration file does not exist
      * @param migrationFiles
      * @param appliedMigrations
-     * @returns
+     * @param log whether to console.log
+     * @returns true or false (indicates if process can continue or should exit)
      */
     private async compareFilesWithDbMigrations(
         migrationFiles: MigrationFileObj[],
-        appliedMigrations: MigrationTableModel[]
+        appliedMigrations: MigrationTableModel[],
+        log = true
     ) {
-        const warningsFileChange: string[] = [];
-        const warningsNoFile: string[] = [];
-        const warningsDuplicate: string[] = [];
-
-        const hashes: string[] = [];
-
-        appliedMigrations.forEach((m) => {
-            const { hash, filename } = m;
-
-            if (hashes.includes(hash)) {
-                warningsDuplicate.push(filename);
-            } else {
-                hashes.push(hash);
+        migrationFiles.forEach((f) => {
+            // check if migration files have duplicate timestamp, causes error
+            const FilesWithSameTs = migrationFiles.filter((r) => r.ts === f.ts);
+            if (FilesWithSameTs.length > 1) {
+                this.errors.push({
+                    name: f.name,
+                    hash: f.hash,
+                    resource: 'FILE',
+                    msg: 'DUPLICATE_TS'
+                });
             }
 
-            // same filename exists, but content of file isn't identical => content has
-            if (
-                !migrationFiles.map((f) => f.hash).includes(hash) &&
-                migrationFiles.map((f) => f.name).includes(filename)
-            ) {
-                warningsFileChange.push(m.filename);
-            }
-
-            // same hash exists but file is missing
-            if (
-                migrationFiles.map((f) => f.hash).includes(hash) &&
-                !migrationFiles.map((f) => f.name).includes(filename)
-            ) {
-                warningsNoFile.push(m.filename);
-            }
-
-            // hash and file doesn't exists
-            if (
-                !migrationFiles.map((f) => f.hash).includes(hash) &&
-                !migrationFiles.map((f) => f.name).includes(filename)
-            ) {
-                warningsNoFile.push(m.filename);
+            // check if migration files have same content
+            const FilesWithSameHash = migrationFiles.filter(
+                (r) => r.hash === f.hash
+            );
+            if (FilesWithSameHash.length > 1) {
+                this.warnings.push({
+                    name: f.name,
+                    hash: f.hash,
+                    resource: 'FILE',
+                    msg: 'DUPLICATE_HASH'
+                });
             }
         });
 
-        if (warningsFileChange.length > 0) {
-            console.log(
-                chalk.blue(
-                    `${chalk.bold(
-                        '[WARNING]'
-                    )} The following files have already been applied but the file content seems to have changed:`
-                )
-            );
-            warningsFileChange.map((f) => {
-                console.log(`- ${f}`);
-            });
-            console.log('\n');
-        }
-        if (warningsNoFile.length > 0) {
-            console.log(
-                chalk.blue(
-                    `${chalk.bold(
-                        '[WARNING]'
-                    )} The following migration steps have been applied but don't exist as a migration file:`
-                )
-            );
-            warningsNoFile.map((f) => {
-                console.log(`- ${f}`);
-            });
-            console.log('\n');
-        }
-        if (warningsDuplicate.length > 0) {
-            console.log(
-                chalk.blue(
-                    `${chalk.bold(
-                        '[WARNING]'
-                    )} The following migration steps contain the same sql content:`
-                )
-            );
-            warningsDuplicate.map((f) => {
-                console.log(`- ${f}`);
-            });
-            console.log('\n');
-        }
+        // Migration in db but no file exists
+        appliedMigrations.forEach((m) => {
+            const fileNames = migrationFiles.map((f) => f.name);
+            const fileHashes = migrationFiles.map((f) => f.hash);
 
-        return [];
+            const FileNameFound = fileNames.includes(m.filename);
+            const FileHashFound = fileHashes.includes(m.hash);
+
+            // hash from db not found in dir
+            if (!FileHashFound) {
+                if (FileNameFound) {
+                    // but file with same name exists, i.e. file content has changed
+                    this.warnings.push({
+                        name: m.filename,
+                        hash: m.hash,
+                        resource: 'FILE',
+                        msg: 'CONTENT_CHANGED'
+                    });
+                } else {
+                    // and file with same is missing
+                    this.warnings.push({
+                        name: m.filename,
+                        hash: m.hash,
+                        resource: 'FILE',
+                        msg: 'MISSING'
+                    });
+                }
+            }
+            // hash exists
+            else {
+                // file with this name not found
+                if (!FileNameFound) {
+                    this.warnings.push({
+                        name: m.filename,
+                        hash: m.hash,
+                        resource: 'FILE',
+                        msg: 'MISSING'
+                    });
+                }
+
+                const FilesWithSameHash = migrationFiles.filter(
+                    (f) => f.hash === m.hash
+                );
+                // multiple files with same hash
+                if (FilesWithSameHash.length > 1) {
+                    this.warnings.push({
+                        name: m.filename,
+                        hash: m.hash,
+                        resource: 'FILE',
+                        msg: 'DUPLICATE_HASH'
+                    });
+                }
+            }
+
+            // check if multiple db records have same hash
+            const DbRecordsWithSamehash = appliedMigrations.filter(
+                (r) => r.hash === m.hash
+            );
+            if (DbRecordsWithSamehash.length > 1) {
+                this.warnings.push({
+                    name: m.filename,
+                    hash: m.hash,
+                    resource: 'DB',
+                    msg: 'DUPLICATE_HASH'
+                });
+            }
+        });
+
+        if (log) {
+            Logger.error(
+                'Multiple migration files have the same timestamp. Migration is not possible as this will cause an erorr!',
+                this.errors
+                    .filter((w) => w.msg === 'DUPLICATE_TS')
+                    .map((w) => w.name),
+                { onlyWithListElements: true }
+            );
+
+            Logger.warning(
+                'The following migration steps have been applied but the migration file content seems to have changed:',
+                this.warnings
+                    .filter((w) => w.msg === 'CONTENT_CHANGED')
+                    .map((w) => w.name),
+                { onlyWithListElements: true }
+            );
+            Logger.warning(
+                "The following migration steps have been applied but don't exist as a migration file:",
+                this.warnings
+                    .filter((w) => w.msg === 'MISSING')
+                    .map((w) => w.name),
+                { onlyWithListElements: true }
+            );
+            Logger.warning(
+                'The following applied migration steps contain the same SQL content:',
+                this.warnings
+                    .filter(
+                        (w) => w.msg === 'DUPLICATE_HASH' && w.resource === 'DB'
+                    )
+                    .map((w) => w.name),
+                { onlyWithListElements: true }
+            );
+            Logger.warning(
+                'The following migration file contain the same sql content:',
+                this.warnings
+                    .filter(
+                        (w) =>
+                            w.msg === 'DUPLICATE_HASH' && w.resource === 'FILE'
+                    )
+                    .map((w) => w.name),
+                { onlyWithListElements: true }
+            );
+        }
     }
 
     /**
@@ -276,18 +334,10 @@ export default class Migration {
 
         const appliedMigrations = await this.listAppliedMigrations();
 
-        if (appliedMigrations.length > 0 && direction === 'up') {
-            console.log(
-                chalk.blue(
-                    `${appliedMigrations.length} migration steps are already applied.\n`
-                )
-            );
-        }
-
         if (direction === 'down' && appliedMigrations.length === 0) {
             console.log(
                 chalk.white.bgYellow(
-                    '[DOWN] not possible. No migrations have been applied.'
+                    '[DOWN] not possible. No migrations have been applied.\n'
                 )
             );
             return;
@@ -296,8 +346,8 @@ export default class Migration {
         // get all migration files
         const migrationFiles = this.listMigrationsFiles(appliedMigrations);
 
-        // check if migrations have been applied for which no file exists
-        this.compareFilesWithDbMigrations(migrationFiles, appliedMigrations);
+        // check and display status
+        await this.status(appliedMigrations, migrationFiles, false);
 
         // filter which migration files to apply
         let migrationsToRun = migrationFiles;
@@ -317,6 +367,23 @@ export default class Migration {
                 .filter((m) => m.applied && m.sql !== '')
                 .slice(-steps);
         }
+
+        if (migrationsToRun.length === 0) {
+            Logger.log(
+                '',
+                {
+                    text: `No migrations are pending for [${direction.toUpperCase()}]`,
+                    bgColor: 'bgYellow'
+                },
+                undefined,
+                { newLine: true }
+            );
+            process.exit();
+        }
+
+        console.log(
+            chalk.bgWhite(`Running Migrations [${direction.toUpperCase()}]\n`)
+        );
 
         return this.dbQuery
             .tx('run_migrations', async (t) => {
@@ -364,35 +431,16 @@ export default class Migration {
                 const appliedM = r.filter((m) => m.success);
                 const notAppliedM = r.filter((m) => !m.success);
 
-                if (appliedM.length === 0) {
-                    console.log(
-                        chalk.white.bgYellow.bold(
-                            `No new migrations files applied [${direction.toUpperCase()}]`
-                        )
-                    );
-                }
-
-                if (appliedM.length > 0) {
-                    console.log(
-                        chalk.white.bgGreen.bold(
-                            `Migration [${direction.toUpperCase()}] successful`
-                        )
-                    );
-                    console.log(
-                        `${appliedM.map((m) => `> ${m.name}`).join('\n')}`
-                    );
-                }
-
-                if (notAppliedM.length > 0) {
-                    console.log(
-                        chalk.blue('\nThe following files were skipped:')
-                    );
-                    notAppliedM.map((m) => {
-                        console.log(`> ${m.name} (${m.msg})`);
-                    });
-                }
-
-                console.log('\n\n');
+                Logger.success(
+                    `Migration completed [${direction.toUpperCase()}]`,
+                    appliedM.map((e) => e.name),
+                    { onlyWithListElements: true }
+                );
+                Logger.info(
+                    'The following files were skipped:',
+                    notAppliedM.map((e) => `${e.name} (${e.msg})`),
+                    { onlyWithListElements: true }
+                );
 
                 await this.createDataTypeFile();
                 return;
@@ -459,32 +507,55 @@ export default class Migration {
     /**
      * Displays status of current migrations
      */
-    async status(showDetails = true) {
-        console.log(chalk.bgWhite('Migration Status:\n'));
+    async status(
+        appliedMigrations: MigrationTableModel[] | null = null,
+        migrationFiles: MigrationFileObj[] | null = null,
+        showDetails = true
+    ) {
+        const _appliedMigrations =
+            appliedMigrations || (await this.listAppliedMigrations());
 
-        const appliedMigrations = await this.listAppliedMigrations();
-        console.log(
-            chalk.blue(`Steps already applied: ${appliedMigrations.length} `)
-        );
+        const _migrationFiles =
+            migrationFiles || this.listMigrationsFiles(_appliedMigrations);
 
-        if (showDetails && appliedMigrations.length > 0) {
-            appliedMigrations.forEach((m) => {
-                console.log(`- ${m.filename}`);
-            });
+        if (this.direction === 'up') {
+            console.log(chalk.bgWhite('Migration Status:\n'));
+
+            console.log(
+                chalk.blue(
+                    `Steps already applied: ${_appliedMigrations.length} `
+                )
+            );
+
+            if (showDetails && _appliedMigrations.length > 0) {
+                _appliedMigrations.forEach((m) => {
+                    console.log(`- ${m.filename}`);
+                });
+            }
+
+            const migrationFilesApplied = _migrationFiles.filter(
+                (f) => !f.applied
+            );
+            console.log(
+                chalk.blue(`\nFiles pending: ${migrationFilesApplied.length}`)
+            );
+            if (showDetails && migrationFilesApplied.length > 0) {
+                migrationFilesApplied.forEach((f) => {
+                    console.log(`- ${f.name}`);
+                });
+            }
+            console.log('\n');
         }
 
-        const migrationFiles = this.listMigrationsFiles(appliedMigrations);
-        const migrationFilesApplied = migrationFiles.filter((f) => !f.applied);
-        console.log(
-            chalk.blue(`\nFiles pending: ${migrationFilesApplied.length}`)
+        await this.compareFilesWithDbMigrations(
+            _migrationFiles,
+            _appliedMigrations,
+            this.direction === 'up'
         );
-        if (showDetails && migrationFilesApplied.length > 0) {
-            migrationFilesApplied.forEach((f) => {
-                console.log(`- ${f.name}`);
-            });
-        }
-        console.log('\n');
 
-        this.compareFilesWithDbMigrations(migrationFiles, appliedMigrations);
+        if (this.errors.length > 0) {
+            console.log(chalk.bgRed('Migration aborted'));
+            process.exit(1);
+        }
     }
 }

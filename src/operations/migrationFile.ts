@@ -13,11 +13,7 @@ import type { ConfigObject } from '../types';
  */
 const createMigrationFile = (name: string, config: ConfigObject) => {
     const template = readFileSync(
-        path.join(
-            path.dirname(__dirname),
-            DEFAULTS.templates.dir,
-            DEFAULTS.templates.migrationSql
-        ),
+        path.join(DEFAULTS.templates.dir, DEFAULTS.templates.migrationSql),
         { encoding: 'utf-8' }
     );
 

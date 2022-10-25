@@ -1,21 +1,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import chalk from 'chalk';
-
 import path from 'path';
 
-import dotenv from 'dotenv';
-
 import DEFAULTS from '../defaults';
-import type {
-    MigrationFileObj,
-    OperationType,
-    MigrationTableModel,
-    ColumnTypesModel,
-    ConfigObject,
-    ConfigRawObject
-} from '../types';
-
-dotenv.config();
 
 /**
  * Creates dir and copies template config.json to it
