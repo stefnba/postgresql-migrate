@@ -1,32 +1,25 @@
-import {
-    readdirSync,
-    readFileSync,
-    writeFileSync,
-    existsSync,
-    mkdirSync
-} from 'fs';
+import { readdirSync, readFileSync, writeFileSync } from 'fs';
 import chalk from 'chalk';
 import crypto from 'crypto';
 import path from 'path';
 import dayjs from 'dayjs';
 import dotenv from 'dotenv';
 
-import { queries, pgp } from './db';
-import DEFAULTS from './defaults';
+import { queries, pgp } from '../db';
+import DEFAULTS from '../defaults';
 import type {
     MigrationFileObj,
     OperationType,
     MigrationTableModel,
     ColumnTypesModel,
-    ConfigObject,
-    ConfigRawObject
-} from './types';
+    ConfigObject
+} from '../types';
 import { IDatabase } from 'pg-promise';
 import pg from 'pg-promise/typescript/pg-subset';
 
 dotenv.config();
 
-export class Migration {
+export default class Migration {
     private config: ConfigObject;
     private direction: OperationType;
     private dbQuery: IDatabase<Record<string, unknown>, pg.IClient>;
@@ -134,23 +127,43 @@ export class Migration {
     ) {
         const warningsFileChange: string[] = [];
         const warningsNoFile: string[] = [];
+        const warningsDuplicate: string[] = [];
 
-        appliedMigrations
-            .map((m) => {
-                // applied db migration not as file
-                if (!migrationFiles.map((f) => f.hash).includes(m.hash)) {
-                    // if same filename exists though
-                    if (
-                        migrationFiles.map((f) => f.name).includes(m.filename)
-                    ) {
-                        warningsFileChange.push(m.filename);
-                    } else {
-                        warningsNoFile.push(m.filename);
-                    }
-                }
-                return null;
-            })
-            .filter((w) => w);
+        const hashes: string[] = [];
+
+        appliedMigrations.forEach((m) => {
+            const { hash, filename } = m;
+
+            if (hashes.includes(hash)) {
+                warningsDuplicate.push(filename);
+            } else {
+                hashes.push(hash);
+            }
+
+            // same filename exists, but content of file isn't identical => content has
+            if (
+                !migrationFiles.map((f) => f.hash).includes(hash) &&
+                migrationFiles.map((f) => f.name).includes(filename)
+            ) {
+                warningsFileChange.push(m.filename);
+            }
+
+            // same hash exists but file is missing
+            if (
+                migrationFiles.map((f) => f.hash).includes(hash) &&
+                !migrationFiles.map((f) => f.name).includes(filename)
+            ) {
+                warningsNoFile.push(m.filename);
+            }
+
+            // hash and file doesn't exists
+            if (
+                !migrationFiles.map((f) => f.hash).includes(hash) &&
+                !migrationFiles.map((f) => f.name).includes(filename)
+            ) {
+                warningsNoFile.push(m.filename);
+            }
+        });
 
         if (warningsFileChange.length > 0) {
             console.log(
@@ -174,6 +187,19 @@ export class Migration {
                 )
             );
             warningsNoFile.map((f) => {
+                console.log(`- ${f}`);
+            });
+            console.log('\n');
+        }
+        if (warningsDuplicate.length > 0) {
+            console.log(
+                chalk.blue(
+                    `${chalk.bold(
+                        '[WARNING]'
+                    )} The following migration steps contain the same sql content:`
+                )
+            );
+            warningsDuplicate.map((f) => {
                 console.log(`- ${f}`);
             });
             console.log('\n');
@@ -270,6 +296,9 @@ export class Migration {
         // get all migration files
         const migrationFiles = this.listMigrationsFiles(appliedMigrations);
 
+        // check if migrations have been applied for which no file exists
+        this.compareFilesWithDbMigrations(migrationFiles, appliedMigrations);
+
         // filter which migration files to apply
         let migrationsToRun = migrationFiles;
         if (this.direction === 'up') {
@@ -288,9 +317,6 @@ export class Migration {
                 .filter((m) => m.applied && m.sql !== '')
                 .slice(-steps);
         }
-
-        // check if migrations have been applied for which no file exists
-        this.compareFilesWithDbMigrations(migrationFiles, appliedMigrations);
 
         return this.dbQuery
             .tx('run_migrations', async (t) => {
@@ -447,137 +473,18 @@ export class Migration {
             });
         }
 
-        const migrationFiles = this.listMigrationsFiles(
-            appliedMigrations
-        ).filter((f) => !f.applied);
-        console.log(chalk.blue(`\nFiles pending: ${migrationFiles.length}`));
-
-        if (showDetails && migrationFiles.length > 0) {
-            migrationFiles.forEach((f) => {
+        const migrationFiles = this.listMigrationsFiles(appliedMigrations);
+        const migrationFilesApplied = migrationFiles.filter((f) => !f.applied);
+        console.log(
+            chalk.blue(`\nFiles pending: ${migrationFilesApplied.length}`)
+        );
+        if (showDetails && migrationFilesApplied.length > 0) {
+            migrationFilesApplied.forEach((f) => {
                 console.log(`- ${f.name}`);
             });
         }
-
         console.log('\n');
 
         this.compareFilesWithDbMigrations(migrationFiles, appliedMigrations);
     }
 }
-
-/**
- * Creates new migration file in migration dir
- * @param name
- */
-export const newMigrationFile = (name: string, config: ConfigObject) => {
-    const template = readFileSync(
-        path.join(
-            path.dirname(__dirname),
-            DEFAULTS.templates.dir,
-            DEFAULTS.templates.migrationSql
-        ),
-        { encoding: 'utf-8' }
-    );
-
-    const filename = `${dayjs().valueOf()}_${name.replace(
-        /_|\s|\.|\\,/g,
-        '-'
-    )}.sql`;
-    const fullpath = path.join(config.migrationsDir, filename);
-    writeFileSync(fullpath, template, { encoding: 'utf-8' });
-
-    console.log(chalk.blue(`${filename} created`));
-};
-
-/**
- * Reads config json and return config object
- * @param configFilePath path to .json file
- * @returns config object
- */
-export const readConfigFile = (
-    configFilePath: string,
-    rootDirPath = './'
-): ConfigObject => {
-    try {
-        const configFile = readFileSync(configFilePath, { encoding: 'utf8' });
-        const configRaw = JSON.parse(configFile) as ConfigRawObject;
-
-        // todo validate json
-        if (!configRaw?.connection) {
-            console.log(chalk.red('Config.json has wrong schema!'));
-            process.exit(1);
-        }
-
-        // integrate env variables for nested database
-        const connectionWithEnvVars = Object.entries(
-            configRaw.connection
-        ).reduce((prev, curr) => {
-            const [key, value] = curr;
-            let v = value;
-
-            if (typeof value === 'string' && value.startsWith('env:')) {
-                const variable = value.replace('env:', '');
-                v = process.env[variable] as string | number;
-            }
-
-            return {
-                ...prev,
-                [key]: v
-            };
-        }, {}) as ConfigObject['connection'];
-
-        const config: ConfigObject = {
-            connection: connectionWithEnvVars,
-            typesFile: configRaw?.typesFile?.startsWith('/')
-                ? configRaw?.typesFile?.slice(1)
-                : path.join(rootDirPath, configRaw?.typesFile || ''),
-            database: {
-                migrationsTable:
-                    configRaw?.database?.migrationsTable ||
-                    DEFAULTS.database.migrationsTable,
-                schema: configRaw?.database?.schema || DEFAULTS.database.schema
-            },
-            migrationsDir:
-                configRaw?.migrationsDir ||
-                path.join(rootDirPath, DEFAULTS.migrationsDir)
-        };
-        return config;
-    } catch (e) {
-        console.log(chalk.red('Config file read error!'));
-        console.log(e);
-        process.exit(1);
-    }
-};
-
-/**
- * Creates dir and copies template config.json to it
- * @param dirPath directory path that holds required files and dirs
- * @param filename name of config file inside dir
- */
-export const setupRoot = (
-    dirPath: string,
-    filename: string = DEFAULTS.templates.configFile
-) => {
-    // root folder
-    if (!existsSync(dirPath)) {
-        mkdirSync(dirPath, { recursive: true });
-    }
-
-    const {
-        templates: { dir, configFile },
-        migrationsDir
-    } = DEFAULTS;
-
-    // config file
-    const json = readFileSync(path.join(dir, configFile), {
-        encoding: 'utf-8'
-    });
-    writeFileSync(path.join(dirPath, filename), json, { encoding: 'utf-8' });
-
-    // migration dir
-    const migrationDirAbsolut = path.join(dirPath, migrationsDir);
-    if (!existsSync(migrationDirAbsolut)) {
-        mkdirSync(migrationDirAbsolut, { recursive: true });
-    }
-
-    console.log(chalk.blue('Migration setup successful'));
-};

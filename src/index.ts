@@ -5,7 +5,7 @@ import path from 'path';
 
 import {
     Migration,
-    newMigrationFile,
+    createMigrationFile,
     readConfigFile,
     setupRoot
 } from './operations';
@@ -79,7 +79,7 @@ if (!rootDirPath) {
             );
             process.exit(1);
         }
-        newMigrationFile(name, config);
+        createMigrationFile(name, config);
         return;
     }
 
