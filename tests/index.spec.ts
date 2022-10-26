@@ -3,7 +3,7 @@ import { assert } from 'chai';
 
 import { readConfigFile } from '../src/operations';
 
-const pathToConfig = 'tests/app/db/config.json';
+const pathToConfig = 'tests/app/db/migration/config.json';
 
 describe('Config File', () => {
     it('should be an object', () => {
