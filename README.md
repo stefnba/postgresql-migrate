@@ -1,6 +1,6 @@
 # Postgresql Migrate
 
-This is a simple CLI migration tool for PostgreSQL and Node.js. Migrations are written in raw SQL. At the end of a successful migration, it generates automatically a TypeScript types file for all tables and columns in the database.
+Simple CLI migration tool for PostgreSQL and Node.js with migration files written in raw SQL. TypeScript types files for all tables and columns in the database are automatically created.
 
 # How it works
 
@@ -8,11 +8,27 @@ Create a JSON config file, e.g. `config.json` with the connection to the databas
 
 Note: the db user used for the migration must have the required privileges to `CREATE TABLES` AND `DROP TABLES`.
 
-#### Create config.json
+### Install package
+
+```bash
+npm install postgresql-migrate
+```
+
+### Setup migration directory
+
+Run the following command with the path to the directory that will contain the directory with the SQL migration files as well as the config.json.
+
+```bash
+postgresql-migrate setup -d "path-to-migration-dir"
+```
+
+### Configure your settings
+
+Open the newly created config.json and specify your settings. For the migration to work, the connection (database) part is required. All other settings are optional.
 
 ```json
 {
-    "database": {
+    "connection": {
         "host": "env:DB_HOST",
         "port": "env:DB_PORT",
         "user": "env:DB_USER",
@@ -24,52 +40,52 @@ Note: the db user used for the migration must have the required privileges to `C
 
 Now you can run various CLI commands, such as creating migration files or applying up or down migration steps. You just need to reference the `config.json`.
 
-#### Run command to create migration file
+### Run command to create migration file
 
 ```bash
-postgresql-migrate -f "path-to-config-json" create "name-of-migration-file"
+postgresql-migrate -d "path-to-migration-dir" create "name-of-migration-file"
 
 ```
 
-#### Provide the migration step in raw SQL
+### Provide the migration step in raw SQL
 
-For a successful migration, you should provide both up and down scripts and these must be inbetween the markeers. This means for `[UP]` migrations `/* BEGIN_UP */` and `/* END_UP */` and for `[DOWN]` migrations between `/* BEGIN_DOWN */` and `/* END_DOWN */`
+For a successful migration, you should provide both up and down scripts and these must be inbetween the markeers. This means for `[UP]` migrations `/* UP */` and for `[DOWN]` migrations between `/* DOWN */`.
 
 ```sql
-/* BEGIN_UP */
+/* UP */
 CREATE TABLE "Users" (
     id SERIAL PRIMARY KEY,
     username VARCHAR NOT NULL,
     email VARCHAR NOT NULL
 );
-/* END_UP */
 
-/* BEGIN_DOWN */
+/* DOWN */
 DROP TABLE IF EXISTS "Users" CASCADE;
-/* END_DOWN */
 
 ```
 
-#### Run migrations with the following CLI command
+### Run migrations with the following CLI command
 
 ```bash
-postgresql-migrate -f "path-to-config-json" up
+postgresql-migrate -d "path-to-migration-dir" up
 ```
 
-#### Add migration command to `package.json`
+### Add migration command to `package.json`
 
 To simplify running commands, it is recommended to add the following command to your `package.json`.
 
 ```json
 {
     "scripts": {
-        "migrate": "postgresql-migrate -f 'path-to-config-json'"
+        "migrate": "postgresql-migrate -d 'path-to-migration-dir'"
     }
 }
 ```
 
+### Run commands
+
 Now you can use any command simply with
 
 ```bash
-npm run migrate create|up|down|redo|reset
+npm run migrate create|up|down|redo|reset|status
 ```
