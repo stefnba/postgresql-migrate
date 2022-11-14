@@ -21,7 +21,7 @@ const createMigrationFile = (name: string, config: ConfigObject) => {
         /_|\s|\.|\\,/g,
         '-'
     )}.sql`;
-    const fullpath = path.join(config.migrationsDir, filename);
+    const fullpath = path.join(config.migrationsDir, filename); // config.migrationsDir is already correct absolute path
     writeFileSync(fullpath, template, { encoding: 'utf-8' });
 
     console.log(chalk.blue(`${filename} created`));

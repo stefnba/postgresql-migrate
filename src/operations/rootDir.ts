@@ -13,29 +13,32 @@ const setupRoot = (
     dirPath: string,
     filename: string = DEFAULTS.templates.configFile
 ) => {
-    // root folder
-    if (!existsSync(dirPath)) {
-        mkdirSync(dirPath, { recursive: true });
+    const { templates, migrationsDir } = DEFAULTS;
+    const dirPathAbsolute = path.join(process.cwd(), dirPath);
+
+    // create root folder
+    if (!existsSync(dirPathAbsolute)) {
+        mkdirSync(dirPathAbsolute, { recursive: true });
     }
 
-    const {
-        templates: { dir, configFile },
-        migrationsDir
-    } = DEFAULTS;
-
-    // config file
-    const json = readFileSync(path.join(dir, configFile), {
+    // create config file
+    const json = readFileSync(
+        path.join(__dirname, '../', templates.dir, templates.configFile),
+        {
+            encoding: 'utf-8'
+        }
+    );
+    writeFileSync(path.join(dirPathAbsolute, filename), json, {
         encoding: 'utf-8'
     });
-    writeFileSync(path.join(dirPath, filename), json, { encoding: 'utf-8' });
 
-    // migration dir
-    const migrationDirAbsolut = path.join(dirPath, migrationsDir);
-    if (!existsSync(migrationDirAbsolut)) {
-        mkdirSync(migrationDirAbsolut, { recursive: true });
+    // create dir for migration files
+    const migrationsDirAbsolut = path.join(dirPathAbsolute, migrationsDir);
+    if (!existsSync(migrationsDirAbsolut)) {
+        mkdirSync(migrationsDirAbsolut, { recursive: true });
     }
 
-    console.log(chalk.blue('Migration setup successful'));
+    console.log(chalk.blue('Setup successful'));
 };
 
 export default setupRoot;

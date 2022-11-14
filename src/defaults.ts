@@ -1,6 +1,8 @@
-export default {
+import path from 'path';
+
+const defaults = {
     templates: {
-        dir: 'templates',
+        dir: '../templates',
         configFile: 'config.json',
         migrationSql: 'template.sql',
         markers: {
@@ -12,6 +14,9 @@ export default {
         schema: 'public',
         migrationsTable: '_migrations'
     },
+    configFile: {
+        name: 'config.json'
+    },
     commands: [
         'up',
         'down',
@@ -22,7 +27,6 @@ export default {
         'status'
     ] as const,
     migrationsDir: './migrations',
-
     typeFile: './types.d.ts',
     dataTypeConversion: {
         int4: 'number',
@@ -41,5 +45,14 @@ export default {
         time: 'Date',
         timestamp: 'Date',
         timestampz: 'Date'
+    }
+};
+
+// make template path absolute
+export default {
+    ...defaults,
+    templates: {
+        ...defaults.templates,
+        dir: path.join(__dirname, defaults.templates.dir)
     }
 };

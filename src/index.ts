@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import yargs from 'yargs';
 import chalk from 'chalk';
-import path from 'path';
 
 import {
     Migration,
@@ -21,8 +20,7 @@ const argv = yargs
     .usage('Usage: $0 [up|down|create|redo|reset|setup|status] [config]')
     .option('d', {
         alias: 'root-dir',
-        describe:
-            'Path to root directory that contains config file migration directory',
+        describe: 'Path to root directory that contains config file',
         type: 'string'
     })
     .help()
@@ -42,8 +40,7 @@ if (argv.help || !DEFAULTS.commands.includes(action)) {
 /**
  * ROOT DIRECTORY AND CONFIG FILE
  */
-const d = argv['d'] as string;
-const rootDirPath = d.startsWith('/') ? d.slice(1) : d;
+const rootDirPath = argv['d'] as string;
 
 if (!rootDirPath) {
     console.error(chalk.red('A root directory must be provided'));
@@ -60,10 +57,7 @@ if (!rootDirPath) {
         process.exit();
     }
 
-    const config = readConfigFile(
-        path.join(rootDirPath, DEFAULTS.templates.configFile),
-        rootDirPath
-    );
+    const config = readConfigFile(rootDirPath);
 
     if (action === 'status') {
         const migration = new Migration(config);

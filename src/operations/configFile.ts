@@ -12,17 +12,22 @@ dotenv.config();
 
 /**
  * Reads config json and return config object
- * @param configFilePath path to .json file
- * @param rootDirPath path to root directory
+ * @param rootDir path to root directory
+ * @param configFileName name of config file, defaults to what is provided in DEFAULTS
  * @returns config object
  */
 const readConfigFile = (
-    configFilePath: string,
-    rootDirPath = './'
+    rootDir: string,
+    configFileName = DEFAULTS.configFile.name
 ): ConfigObject => {
     try {
-        const configFile = readFileSync(configFilePath, { encoding: 'utf8' });
-        const configRaw = JSON.parse(configFile) as ConfigRawObject;
+        const rootDirAbsolute = path.join(process.cwd(), rootDir);
+
+        const configRaw = JSON.parse(
+            readFileSync(path.join(rootDirAbsolute, configFileName), {
+                encoding: 'utf8'
+            })
+        ) as ConfigRawObject;
 
         // todo validate json
         if (!configRaw?.connection) {
@@ -50,18 +55,20 @@ const readConfigFile = (
 
         const config: ConfigObject = {
             connection: connectionWithEnvVars,
-            typesFile: configRaw?.typesFile?.startsWith('/')
-                ? configRaw?.typesFile?.slice(1)
-                : path.join(rootDirPath, configRaw?.typesFile || ''),
             database: {
                 migrationsTable:
                     configRaw?.database?.migrationsTable ||
                     DEFAULTS.database.migrationsTable,
                 schema: configRaw?.database?.schema || DEFAULTS.database.schema
             },
-            migrationsDir:
-                configRaw?.migrationsDir ||
-                path.join(rootDirPath, DEFAULTS.migrationsDir)
+            typesFile: configRaw?.typesFile?.startsWith('/')
+                ? path.join(process.cwd(), configRaw?.typesFile)
+                : path.join(rootDirAbsolute, configRaw?.typesFile || ''),
+            migrationsDir: configRaw?.migrationsDir
+                ? configRaw?.migrationsDir?.startsWith('/')
+                    ? path.join(process.cwd(), configRaw?.migrationsDir)
+                    : path.join(rootDirAbsolute, configRaw?.migrationsDir || '')
+                : path.join(rootDirAbsolute, DEFAULTS.migrationsDir)
         };
         return config;
     } catch (e) {
