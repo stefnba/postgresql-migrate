@@ -22,12 +22,9 @@ const setupRoot = (
     }
 
     // create config file
-    const json = readFileSync(
-        path.join(__dirname, '../', templates.dir, templates.configFile),
-        {
-            encoding: 'utf-8'
-        }
-    );
+    const json = readFileSync(path.join(templates.dir, templates.configFile), {
+        encoding: 'utf-8'
+    });
     writeFileSync(path.join(dirPathAbsolute, filename), json, {
         encoding: 'utf-8'
     });

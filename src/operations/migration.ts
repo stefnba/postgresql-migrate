@@ -52,11 +52,7 @@ export default class Migration {
                 const [ts_, title] = f.split('_');
                 const ts = Number.parseInt(ts_);
 
-                const fullpath = path.join(
-                    process.cwd(),
-                    this.config.migrationsDir,
-                    f
-                );
+                const fullpath = path.join(this.config.migrationsDir, f);
 
                 const fileContent = this.readMigrationFile(fullpath);
                 const hash = this.hashSql(fileContent.content);

@@ -61,9 +61,11 @@ const readConfigFile = (
                     DEFAULTS.database.migrationsTable,
                 schema: configRaw?.database?.schema || DEFAULTS.database.schema
             },
-            typesFile: configRaw?.typesFile?.startsWith('/')
-                ? path.join(process.cwd(), configRaw?.typesFile)
-                : path.join(rootDirAbsolute, configRaw?.typesFile || ''),
+            typesFile: configRaw?.typesFile
+                ? configRaw?.typesFile?.startsWith('/')
+                    ? path.join(process.cwd(), configRaw?.typesFile)
+                    : path.join(rootDirAbsolute, configRaw?.typesFile || '')
+                : undefined,
             migrationsDir: configRaw?.migrationsDir
                 ? configRaw?.migrationsDir?.startsWith('/')
                     ? path.join(process.cwd(), configRaw?.migrationsDir)
