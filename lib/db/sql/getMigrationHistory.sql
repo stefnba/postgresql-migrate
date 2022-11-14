@@ -3,7 +3,9 @@ SELECT
     "filename",
     "createdAt",
     "runAt",
-    "title"
+    "title",
+    "content",
+    "hash"
 FROM
     $<table:name>
 ORDER BY

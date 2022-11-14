@@ -1,13 +1,22 @@
 declare const _default: {
-    templateFile: string;
-    templateDirectionMarkers: {
-        up: RegExp;
-        down: RegExp;
+    templates: {
+        dir: string;
+        configFile: string;
+        migrationSql: string;
+        markers: {
+            up: RegExp;
+            down: RegExp;
+        };
     };
-    commands: readonly ["up", "down", "create", "redo", "reset"];
-    migrationDir: string;
-    migrationTable: string;
-    databaseSchema: string;
+    database: {
+        schema: string;
+        migrationsTable: string;
+    };
+    configFile: {
+        name: string;
+    };
+    commands: readonly ["up", "down", "create", "redo", "reset", "setup", "status"];
+    migrationsDir: string;
     typeFile: string;
     dataTypeConversion: {
         int4: string;
