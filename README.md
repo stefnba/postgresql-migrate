@@ -87,5 +87,5 @@ To simplify running commands, it is recommended to add the following command to 
 Now you can use any command simply with
 
 ```bash
-npm run migrate create|up|down|redo|reset|status
+npm run migrate [up|down|create|redo|reset|setup|status]
 ```
