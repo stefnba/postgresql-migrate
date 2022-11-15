@@ -49,7 +49,7 @@ postgresql-migrate -d "path-to-migration-dir" create "name-of-migration-file"
 
 ### Provide the migration step in raw SQL
 
-For a successful migration, you should provide both up and down scripts and these must be inbetween the markeers. This means for `[UP]` migrations `/* UP */` and for `[DOWN]` migrations between `/* DOWN */`.
+For a successful migration, you should provide both up and down scripts and these must be placed after the `/* UP */` comment for the `[UP]` migration script and after `/* DOWN */` for the `[DOWN]` migration script.
 
 ```sql
 /* UP */
