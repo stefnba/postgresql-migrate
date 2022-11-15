@@ -3,14 +3,14 @@ import { assert } from 'chai';
 
 import { readConfigFile } from '../src/operations';
 
-const pathToConfig = 'tests/app/db/migration/config.json';
+const pathToMigrationDir = 'tests/app/db/migration';
 
 describe('Config File', () => {
-    it('should be an object', () => {
+    it('Should be an object', () => {
         assert.isFunction(readConfigFile);
     });
-    it('should return config object', () => {
-        const config = readConfigFile(pathToConfig);
+    it('Should return config object', () => {
+        const config = readConfigFile(pathToMigrationDir);
         assert.isObject(config);
     });
 });
