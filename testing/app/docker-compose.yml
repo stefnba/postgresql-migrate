@@ -15,4 +15,4 @@ services:
             - '${DB_PORT}:5432'
         volumes:
             # Run setup scripts
-            - ./tests/app/db/scripts:/docker-entrypoint-initdb.d/
+            - ./testing/app/db/scripts:/docker-entrypoint-initdb.d/
