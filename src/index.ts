@@ -23,25 +23,62 @@ const argv = yargs
         describe: 'Path to root directory that contains config file',
         type: 'string'
     })
+    .option('p', {
+        alias: 'port',
+        describe: 'Port of database connection',
+        type: 'number'
+    })
+    .option('h', {
+        alias: 'host',
+        describe: 'Host of database connection',
+        type: 'string'
+    })
+    .option('n', {
+        alias: 'db-name',
+        describe: 'Database name of database connection',
+        type: 'string'
+    })
+    .option('s', {
+        alias: 'schema',
+        describe: 'Database schema of database connection',
+        type: 'string'
+    })
+    .option('w', {
+        alias: 'password',
+        describe: 'Password of database connection',
+        type: 'string'
+    })
+    .option('u', {
+        alias: 'user',
+        describe: 'User of database connection',
+        type: 'string'
+    })
+    .option('l', {
+        alias: 'logging',
+        describe: 'Enable logging',
+        type: 'string'
+    })
     .help()
     .parseSync();
 
-const action = argv._.shift() as ActionType;
+const action = argv._.shift() as ActionType; // argument w/o option flag
+const rootDirPath = argv.d;
+const loggingEnabled = argv.l ? true : false;
+const cliConnection = {
+    host: argv.h,
+    port: argv.p,
+    user: argv.u,
+    password: argv.w,
+    database: argv.n,
+    schema: argv.s
+};
 
-/**
- * VALID COMMANDS
- * If none provided, show help and exit
- */
+// Ensure valid command is provided
 if (argv.help || !DEFAULTS.commands.includes(action)) {
     yargs.showHelp();
     process.exit(1);
 }
-
-/**
- * ROOT DIRECTORY AND CONFIG FILE
- */
-const rootDirPath = argv['d'] as string;
-
+// Ensure root dir is provided
 if (!rootDirPath) {
     console.error(chalk.red('A root directory must be provided'));
     process.exit(1);
