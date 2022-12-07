@@ -9,7 +9,7 @@ import {
     setupRoot
 } from './operations';
 import DEFAULTS from './defaults';
-import type { ActionType } from './types';
+import type { ActionType, MigrateParams } from './types';
 
 process.on('uncaughtException', (err) => {
     console.error(err);
@@ -73,68 +73,82 @@ const cliConnection = {
     schema: argv.s
 };
 
-// Ensure valid command is provided
-if (argv.help || !DEFAULTS.commands.includes(action)) {
-    yargs.showHelp();
-    process.exit(1);
-}
-// Ensure root dir is provided
-if (!rootDirPath) {
-    console.error(chalk.red('A root directory must be provided'));
-    process.exit(1);
-}
+export default async function migrate(params: MigrateParams) {
+    // Ensure valid action command is provided
+    if (
+        argv.help ||
+        !params.action ||
+        !DEFAULTS.commands.includes(params.action)
+    ) {
+        yargs.showHelp();
+        process.exit(1);
+    }
+    // Ensure root dir is provided
+    if (!params.rootDirPath) {
+        console.error(chalk.red('A root directory must be provided'));
+        process.exit(1);
+    }
 
-/**
- * ACTIONS
- */
-(async () => {
     // no config required
-    if (action == 'setup') {
-        setupRoot(rootDirPath);
+    if (params.action == 'setup') {
+        setupRoot(params.rootDirPath);
         process.exit();
     }
 
-    const config = readConfigFile(rootDirPath);
+    const config = readConfigFile(params.rootDirPath);
 
-    if (action === 'status') {
+    if (params.action === 'status') {
         const migration = new Migration(config);
         await migration.status();
         process.exit();
     }
 
-    if (action === 'create') {
-        const name = argv._[0];
-        if (!name || !(typeof name === 'string')) {
+    if (params.action === 'create') {
+        if (
+            params.addArgs.length > 0 &&
+            typeof params.addArgs[0] === 'string'
+        ) {
+            const name = params.addArgs[0];
+            createMigrationFile(name, config);
+            process.exit();
+        } else {
             console.error(
                 chalk.red('Must provide a name for the migration file!')
             );
             process.exit(1);
         }
-        createMigrationFile(name, config);
-        return;
     }
 
-    if (action === 'reset') {
+    if (params.action === 'reset') {
         const migration = new Migration(config);
         await migration.reset();
         process.exit();
     }
 
-    const steps = (argv._[0] as number) || null;
-    if (steps && !Number.isInteger(steps)) {
-        console.error(chalk.red('Steps must be an integer!'));
-        process.exit(1);
+    // Steps
+    let steps = null;
+    if (params.addArgs.length > 0) {
+        if (!Number.isInteger(params.addArgs[0])) {
+            console.error(chalk.red('Steps must be an integer!'));
+            process.exit(1);
+        } else {
+            steps = params.addArgs[0] as number;
+        }
     }
 
-    if (action === 'redo') {
+    if (params.action === 'redo') {
         const migration = new Migration(config);
         await migration.run('down', steps);
         await migration.run('up', steps);
+        process.exit();
     }
 
-    if (action === 'up' || action === 'down') {
+    if (params.action === 'up' || action === 'down') {
         const migration = new Migration(config);
-        await migration.run(action, steps);
+        await migration.run(params.action, steps);
+        process.exit();
     }
     process.exit();
-})();
+}
+
+migrate({ rootDirPath, action, loggingEnabled, addArgs: argv._ });

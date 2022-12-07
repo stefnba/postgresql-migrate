@@ -6,14 +6,19 @@ import DEFAULTS from './defaults';
 export type ConfigRawObject = {
     migrationsDir?: string;
     typesFile?: string;
-    connection: {
-        host: string;
-        port: number | string;
-        user: string;
-        password: string;
-        database: string;
-    };
+    connection: DatabaseConnection;
     database: { schema?: string; migrationsTable?: string };
+};
+
+/**
+ * Database connection
+ */
+export type DatabaseConnection = {
+    host: string;
+    port: number | undefined;
+    user: string;
+    password: string;
+    database: string;
 };
 
 export type ConfigObject = Omit<Required<ConfigRawObject>, 'typesFile'> & {
@@ -88,3 +93,13 @@ export type LoggerOptionParam = {
     type?: LoggerTypeParam;
     newLine?: boolean;
 };
+
+/**
+ * Main Migrate function
+ */
+export interface MigrateParams {
+    rootDirPath: string | undefined;
+    action: ActionType;
+    loggingEnabled: boolean;
+    addArgs: (string | number)[];
+}
