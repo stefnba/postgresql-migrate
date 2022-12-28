@@ -60,7 +60,7 @@
         "dayjs": "^1.11.5",
         "dotenv": "^16.0.3",
         "pg-promise": "^10.12.0",
-        "postgresql-node": "^1.1.8",
+        "postgresql-node": "^1.1.9",
         "yargs": "^17.6.0"
     }
 }

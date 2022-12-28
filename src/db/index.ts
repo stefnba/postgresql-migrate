@@ -1,4 +1,3 @@
-import queries from './query';
-import pgp from './pgp';
+import client from './client';
 
-export { queries, pgp };
+export default client;

@@ -56,6 +56,10 @@ export type MigrationTableModel = {
     hash: string;
 };
 
+export type TablesModel = {
+    tablename: string;
+};
+
 export type ColumnTypesModel = {
     tableName: string;
     columns: Array<{
