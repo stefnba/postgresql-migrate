@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import dayjs from 'dayjs';
 import PostgresClient from 'postgresql-node';
+import { DatabaseClientExtended } from 'postgresql-node/lib/types';
 
 import { replaceEnvVar, setFilePath } from './utils';
 import { MigrationRecord, MigrationTable } from './db';
@@ -24,7 +25,10 @@ import type {
 import { MigrationError, MigrationWarning } from './error';
 
 export default class PostgresMigration {
-    db!: PostgresClient;
+    db!: DatabaseClientExtended<{
+        migrationRecord: typeof MigrationRecord;
+        migrationTable: typeof MigrationTable;
+    }>;
 
     config: ConfigObject;
     private _status: MigrationStatus;
@@ -45,22 +49,18 @@ export default class PostgresMigration {
      * Establishes and tests connection to database and provides queries
      * @param client PostgresClient
      */
-    async dbInit(client?: PostgresClient) {
-        if (client) {
-            this.db = client;
-        } else {
-            const client = new PostgresClient(this.config.database.connection, {
-                connect: {
-                    testOnInit: true
-                }
-            });
-            const db = client.addRepositories({
-                migrationRecord: MigrationRecord,
-                migrationTable: MigrationTable
-            });
+    async dbInit() {
+        const client = new PostgresClient(this.config.database.connection, {
+            connect: {
+                testOnInit: true
+            }
+        });
+        const db = client.addRepositories({
+            migrationRecord: MigrationRecord,
+            migrationTable: MigrationTable
+        });
 
-            this.db = db;
-        }
+        this.db = db;
     }
 
     /**
@@ -169,8 +169,12 @@ export default class PostgresMigration {
      * @param steps
      * @returns
      */
-    private async applyMigrations(direction: OperationType, steps?: number) {
-        // todo create migration table, if not yet exists
+    private async applyMigrations(
+        direction: OperationType,
+        steps?: number
+    ): Promise<void> {
+        // create migration table
+        await this.db.repos.migrationTable.create(this.config.database.table);
 
         const migrationsApplied = await this.listAppliedMigrations();
         const migrationFiles = await this.listMigrationsFiles();
@@ -199,13 +203,50 @@ export default class PostgresMigration {
             );
         }
 
-        await this.db.query.transaction(async (t) => {
-            await t.run('CREATE TABLE IF NOT EXISTS asdasd(id int)').none();
-        });
+        // apply migrations
+        await this.db.query
+            .transaction(async (t) => {
+                return Promise.all(
+                    migrationsToApply.map(async (m) => {
+                        const migrationCommand = m[direction];
 
-        // console.log(migrationsToApply);
+                        // check if migrationCommand for direction exists in file
+                        if (migrationCommand) {
+                            await t.run(m[direction]).none();
 
-        return 1;
+                            return {
+                                succes: true,
+                                migration: m
+                            };
+                        } else {
+                            return {
+                                succes: false,
+                                migration: m
+                                // error: ''
+                            };
+                        }
+                    })
+                );
+            })
+            .then(async (m) => {
+                const success = m
+                    .filter((m) => m.succes)
+                    .map((m) => m.migration);
+
+                await this.db.repos.migrationRecord.add(
+                    this.config.database.table,
+                    success
+                );
+
+                this._status.status = 'UP_MIGRATIONS_COMPLETED';
+                this._status.info = {
+                    applied: [],
+                    skipped: []
+                };
+            })
+            .catch((err) => {
+                console.log(err);
+            });
     }
 
     /**
@@ -265,8 +306,9 @@ export default class PostgresMigration {
      */
     private async listAppliedMigrations() {
         if (!this.appliedMigrations || this.appliedMigrations.length === 0) {
-            this.appliedMigrations = [];
-            // await this.dbQueries.migrationRecord.list();
+            this.appliedMigrations = await this.db.repos.migrationRecord.list(
+                this.config.database.table
+            );
         }
         // return this.appliedMigrations;
         return this.appliedMigrations;
