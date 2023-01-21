@@ -17,16 +17,8 @@ const defaults = {
     configFile: {
         name: 'config.json'
     },
-    commands: [
-        'up',
-        'down',
-        'create',
-        'redo',
-        'reset',
-        'setup',
-        'status'
-    ] as const,
-    migrationsDir: './migrations',
+    commands: ['up', 'down', 'create', 'redo', 'reset', 'status'] as const,
+    migrationDir: './migrations',
     typeFile: './types.d.ts',
     dataTypeConversion: {
         int4: 'number',

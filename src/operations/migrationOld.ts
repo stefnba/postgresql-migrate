@@ -5,7 +5,7 @@ import path from 'path';
 import dayjs from 'dayjs';
 import dotenv from 'dotenv';
 
-import dbClient from '../db';
+import dbClient from '../db/client';
 import DEFAULTS from '../defaults';
 import type {
     MigrationFileObj,
@@ -36,68 +36,6 @@ export default class Migration {
 
         this.errors = [];
         this.warnings = [];
-    }
-
-    /**
-     * Reads all files and returns .sql files from migration dir with additional infos
-     */
-    private listMigrationsFiles(appliedMigrations: MigrationTableModel[]) {
-        const dirFiles = readdirSync(this.config.migrationsDir);
-
-        const migrationFiles: MigrationFileObj[] = [];
-
-        dirFiles.forEach((f) => {
-            if (f.endsWith('.sql')) {
-                // todo check if filename is correct
-                const [ts_, title] = f.split('_');
-                const ts = Number.parseInt(ts_);
-
-                const fullpath = path.join(this.config.migrationsDir, f);
-
-                const fileContent = this.readMigrationFile(fullpath);
-                const hash = this.hashSql(fileContent.content);
-
-                migrationFiles.push({
-                    fullpath,
-                    name: f,
-                    ts,
-                    title,
-                    applied: appliedMigrations
-                        .map((f) => f.filename)
-                        .includes(f),
-                    sql: fileContent[this.direction],
-                    content: fileContent.content,
-                    hash
-                });
-            }
-        });
-
-        return migrationFiles.sort((a, b) => a.ts - b.ts);
-    }
-
-    /**
-     *
-     * @param path absolute path to migration file
-     */
-    private readMigrationFile(path: string) {
-        if (!this.direction)
-            throw new Error('Migration direction not specified!');
-
-        const content = readFileSync(path, { encoding: 'utf-8' });
-
-        const replacString = (s: string | undefined) => {
-            if (!s) return '';
-            return s.replace(/(?:\r\n|\r|\n)/g, '').trim();
-        };
-
-        const downMatch = content.match(DEFAULTS.templates.markers.down);
-        const upMatch = content.match(DEFAULTS.templates.markers.up);
-
-        return {
-            down: replacString(downMatch?.[1]) || '',
-            up: replacString(upMatch?.[1]) || '',
-            content: content
-        };
     }
 
     /**
@@ -252,109 +190,9 @@ export default class Migration {
         }
     }
 
-    /**
-     * Converts postgres data types to data types for TypeScript
-     * @returns types string for TypeScript
-     */
-    private async parseDataTypes(): Promise<string> {
-        const columns = await this.dbQuery.types.listDataTypes();
-
-        return columns
-            .map((col) => {
-                const { tableName, columns } = col;
-                const colTypes = columns.map((c) => {
-                    return `${c.columnName}${
-                        c.isNullable === 'YES' ? '?' : ''
-                    }: ${
-                        DEFAULTS.dataTypeConversion[c.dataType] || 'unknown'
-                    };`;
-                });
-
-                const type = `export type ${tableName} = { \n${colTypes.join(
-                    '\n'
-                )} }\n`;
-                return type;
-            })
-            .join('\n');
-    }
-
-    /**
-     * Creates types.d.ts file with data types from database, only when path is provided in config.json
-     */
-    private async createDataTypeFile() {
-        const { typesFile } = this.config;
-        if (!typesFile) return;
-        const dataTypes = await this.parseDataTypes();
-        writeFileSync(typesFile, dataTypes, {
-            encoding: 'utf8'
-        });
-        return;
-    }
-
-    /**
-     * Executues migration against database
-     * @param direction upwards or down
-     * @param steps how many migration files to run
-     */
     async run(direction: OperationType = 'up', steps: number | null = null) {
-        this.direction = direction;
-
-        // create migration table, if not yet exists
-        await this.dbQuery.migration.createMigrationTable();
-
-        const appliedMigrations =
-            await this.dbQuery.migration.listAppliedMigrations();
-
-        if (direction === 'down' && appliedMigrations.length === 0) {
-            console.log(
-                chalk.white.bgYellow(
-                    '[DOWN] not possible. No migrations have been applied.\n'
-                )
-            );
-            return;
-        }
-
-        // get all migration files
-        const migrationFiles = this.listMigrationsFiles(appliedMigrations);
-
         // check and display status
         await this.status(appliedMigrations, migrationFiles, false);
-
-        // filter which migration files to apply
-        let migrationsToRun = migrationFiles;
-        if (this.direction === 'up') {
-            // remove all applied ones
-            migrationsToRun = migrationsToRun.filter((m) => !m.applied);
-            // apply only n steps, only non-empty files should be used
-            if (steps) {
-                migrationsToRun = migrationsToRun
-                    .filter((m) => m.sql !== '')
-                    .slice(0, steps);
-            }
-        }
-        if (this.direction === 'down' && steps) {
-            // for steps down are only applied migration files relevant and those that contain sql, i.e. are not empty
-            migrationsToRun = migrationsToRun
-                .filter((m) => m.applied && m.sql !== '')
-                .slice(-steps);
-        }
-
-        if (migrationsToRun.length === 0) {
-            Logger.log(
-                '',
-                {
-                    text: `No migrations are pending for [${direction.toUpperCase()}]`,
-                    bgColor: 'bgYellow'
-                },
-                undefined,
-                { newLine: true }
-            );
-            process.exit();
-        }
-
-        console.log(
-            chalk.bgWhite(`Running Migrations [${direction.toUpperCase()}]\n`)
-        );
 
         return this.dbQuery
             .trx('run_migrations', async (t: any) => {
@@ -421,21 +259,6 @@ export default class Migration {
                 console.log(e);
                 return;
             });
-    }
-
-    /**
-     * Hashes sql query file content for checking if changes were made
-     * @param sql query file content
-     * @returns
-     */
-    private hashSql(sql: string) {
-        return (
-            'sha256-' +
-            crypto
-                .createHash('sha256')
-                .update(sql.replace(/\s{2,}|\n/g, ' '))
-                .digest('base64')
-        );
     }
 
     /**

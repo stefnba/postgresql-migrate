@@ -1,44 +1,44 @@
 import DEFAULTS from './defaults';
 
 /**
- * Config as read from .json file
- */
-export type ConfigRawObject = {
-    migrationsDir?: string;
-    typesFile?: string;
-    connection: DatabaseConnection;
-    database: { schema?: string; migrationsTable?: string };
-};
-
-/**
  * Database connection
  */
 export type DatabaseConnection = {
-    host: string;
+    host: string | undefined;
     port: number | undefined;
     user: string;
     password: string;
     database: string;
 };
 
-export type ConfigObject = Omit<Required<ConfigRawObject>, 'typesFile'> & {
+export type ConfigObject = {
     typesFile: string | undefined;
-    connection: {
-        port: number;
-    };
-    database: { schema: string; migrationsTable: string };
+    migrationDir: string;
+    database: { schema: string; table: string; connection: DatabaseConnection };
+};
+
+/**
+ * Config as read from .json file
+ */
+export type ConfigFile = {
+    migrationDir?: string;
+    typesFile?: string;
+    connection: DatabaseConnection;
+    migrationTable?: string;
+    migrationSchema?: string;
 };
 
 /**
  * Read migration file and adds meta info
  */
-export type MigrationFileObj = {
+export type MigrationFile = {
     fullpath: string;
-    name: string;
+    filename: string;
     ts: number;
     title: string;
     applied: boolean;
-    sql: string;
+    down: string;
+    up: string;
     content: string;
     hash: string;
 };
@@ -55,6 +55,8 @@ export type MigrationTableModel = {
     content: string;
     hash: string;
 };
+
+export type MigrationRecordData = Omit<MigrationTableModel, 'id' | 'runAt'>;
 
 export type TablesModel = {
     tablename: string;
@@ -99,11 +101,37 @@ export type LoggerOptionParam = {
 };
 
 /**
- * Main Migrate function
+ * Main Migration
  */
-export interface MigrateParams {
-    rootDirPath: string | undefined;
+export interface MigrationParams {
     action: ActionType;
-    loggingEnabled: boolean;
-    addArgs: (string | number)[];
+    cliArgs: CliArgs;
 }
+export type AdditionalArgs = (string | number)[];
+export type MigrationStatus = {
+    action: ActionType;
+    status: undefined | RunStatus;
+    info?: Record<string, unknown>;
+};
+
+export type RunStatus =
+    | 'PENDING'
+    | 'FILE_CREATED'
+    | 'UP_MIGRATIONS_COMPLETED'
+    | 'DOWN_MIGRATIONS_COMPLETED'
+    | 'MIGRATIONS_RESET_COMPLETED'
+    | 'MIGRATIONS_REDO_COMPLETED';
+
+export type CliArgs = {
+    configPath?: string;
+    migrationsDir?: string;
+    host?: string;
+    port?: number;
+    user?: string;
+    password?: string;
+    database?: string;
+    schema?: string;
+    logging?: boolean;
+    typesPath?: string;
+    table?: string;
+};

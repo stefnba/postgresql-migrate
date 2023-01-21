@@ -1,15 +1,9 @@
 #!/usr/bin/env node
 import yargs from 'yargs';
-import chalk from 'chalk';
 
-import {
-    Migration,
-    createMigrationFile,
-    readConfigFile,
-    setupRoot
-} from './operations';
 import DEFAULTS from './defaults';
-import type { ActionType, MigrateParams } from './types';
+import PostgresMigration from './migration';
+import type { ActionType, CliArgs } from './types';
 
 process.on('uncaughtException', (err) => {
     console.error(err);
@@ -18,9 +12,14 @@ process.on('uncaughtException', (err) => {
 
 const argv = yargs
     .usage('Usage: $0 [up|down|create|redo|reset|setup|status] [config]')
-    .option('d', {
-        alias: 'root-dir',
-        describe: 'Path to root directory that contains config file',
+    .option('c', {
+        alias: 'config',
+        describe: 'Path to config file',
+        type: 'string'
+    })
+    .option('m', {
+        alias: 'migrations',
+        describe: 'Path to migrations directory',
         type: 'string'
     })
     .option('p', {
@@ -33,8 +32,8 @@ const argv = yargs
         describe: 'Host of database connection',
         type: 'string'
     })
-    .option('n', {
-        alias: 'db-name',
+    .option('d', {
+        alias: 'database',
         describe: 'Database name of database connection',
         type: 'string'
     })
@@ -58,97 +57,52 @@ const argv = yargs
         describe: 'Enable logging',
         type: 'string'
     })
+    .option('dt', {
+        alias: 'typesFile',
+        describe: 'Path for file that contains model types',
+        type: 'string'
+    })
+    .option('t', {
+        alias: 'table',
+        describe: 'Database table name for migration records',
+        type: 'string'
+    })
     .help()
     .parseSync();
 
 const action = argv._.shift() as ActionType; // argument w/o option flag
-const rootDirPath = argv.d;
-const loggingEnabled = argv.l ? true : false;
-const cliConnection = {
+const cliArgs: CliArgs = {
+    configPath: argv.c,
+    migrationsDir: argv.m,
     host: argv.h,
     port: argv.p,
     user: argv.u,
     password: argv.w,
-    database: argv.n,
-    schema: argv.s
+    database: argv.d,
+    schema: argv.s,
+    typesPath: argv.dt,
+    table: argv.t,
+    logging: argv.l ? true : false
 };
 
-export default async function migrate(params: MigrateParams) {
+const main = async () => {
     // Ensure valid action command is provided
-    if (
-        argv.help ||
-        !params.action ||
-        !DEFAULTS.commands.includes(params.action)
-    ) {
+    if (argv.help || !action || !DEFAULTS.commands.includes(action)) {
         yargs.showHelp();
-        process.exit(1);
-    }
-    // Ensure root dir is provided
-    if (!params.rootDirPath) {
-        console.error(chalk.red('A root directory must be provided'));
-        process.exit(1);
+        return {
+            error: ''
+        };
     }
 
-    // no config required
-    if (params.action == 'setup') {
-        setupRoot(params.rootDirPath);
-        process.exit();
-    }
+    const migration = new PostgresMigration({
+        action,
+        cliArgs
+    });
+    await migration.run(argv._);
 
-    const config = readConfigFile(params.rootDirPath);
+    console.log(migration.status());
 
-    if (params.action === 'status') {
-        const migration = new Migration(config);
-        await migration.status();
-        process.exit();
-    }
-
-    if (params.action === 'create') {
-        if (
-            params.addArgs.length > 0 &&
-            typeof params.addArgs[0] === 'string'
-        ) {
-            const name = params.addArgs[0];
-            createMigrationFile(name, config);
-            process.exit();
-        } else {
-            console.error(
-                chalk.red('Must provide a name for the migration file!')
-            );
-            process.exit(1);
-        }
-    }
-
-    if (params.action === 'reset') {
-        const migration = new Migration(config);
-        await migration.reset();
-        process.exit();
-    }
-
-    // Steps
-    let steps = null;
-    if (params.addArgs.length > 0) {
-        if (!Number.isInteger(params.addArgs[0])) {
-            console.error(chalk.red('Steps must be an integer!'));
-            process.exit(1);
-        } else {
-            steps = params.addArgs[0] as number;
-        }
-    }
-
-    if (params.action === 'redo') {
-        const migration = new Migration(config);
-        await migration.run('down', steps);
-        await migration.run('up', steps);
-        process.exit();
-    }
-
-    if (params.action === 'up' || action === 'down') {
-        const migration = new Migration(config);
-        await migration.run(params.action, steps);
-        process.exit();
-    }
     process.exit();
-}
+};
 
-migrate({ rootDirPath, action, loggingEnabled, addArgs: argv._ });
+main();
