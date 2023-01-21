@@ -6,5 +6,6 @@
         "password": "env:DB_PASSWORD",
         "database": "env:DB_NAME"
     },
+    "migrations": "./migrations",
     "typesFile": "./model.d.ts"
 }
