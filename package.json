@@ -9,7 +9,7 @@
         "build": "npm run clean && tsc && npm run copy",
         "copy": "copyfiles -u 1 \"src/db/sql/*.sql\" \"lib\"",
         "prepack": "npm run build",
-        "test": "npm run docker && mocha",
+        "test": "mocha",
         "docker": "docker compose -f testing/app/docker-compose.yml --project-directory . up -d --build --force-recreate",
         "format": "prettier --write \"src/**/*.ts\" \"lib/**/*.js\"",
         "lint": "tslint -p tsconfig.json",
@@ -18,7 +18,7 @@
         "preversion": "npm run lint",
         "version": "npm run format && git add -A src",
         "postversion": "git push && git push --tags",
-        "migrate": "ts-node src/index.ts -d /testing/app/db/migration"
+        "migrate": "ts-node src/index.ts -c /testing/app/db/migration/config.json"
     },
     "bin": "lib/index.js",
     "repository": {
@@ -60,7 +60,7 @@
         "dayjs": "^1.11.5",
         "dotenv": "^16.0.3",
         "pg-promise": "^10.12.0",
-        "postgresql-node": "^1.1.9",
+        "postgresql-node": "^2.0.0",
         "yargs": "^17.6.0"
     }
 }
