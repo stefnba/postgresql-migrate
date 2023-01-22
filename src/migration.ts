@@ -11,6 +11,7 @@ import { MigrationRecord, MigrationTable } from './db';
 import DEFAULTS from './defaults';
 
 import type {
+    MigrationQueue,
     MigrationParams,
     MigrationStatus,
     ConfigObject,
@@ -20,9 +21,15 @@ import type {
     AdditionalArgs,
     MigrationTableModel,
     MigrationFile,
-    OperationType
+    OperationType,
+    MigrationFiles
 } from './types';
-import { MigrationError, MigrationWarning } from './error';
+import {
+    DatabaseConnectionError,
+    MigrationError,
+    MigrationWarning
+} from './error';
+import { QueryExecutionError } from 'postgresql-node/lib/error';
 
 export default class PostgresMigration {
     db!: DatabaseClientExtended<{
@@ -47,12 +54,15 @@ export default class PostgresMigration {
 
     /**
      * Establishes and tests connection to database and provides queries
-     * @param client PostgresClient
      */
     async dbInit() {
         const client = new PostgresClient(this.config.database.connection, {
             connect: {
-                testOnInit: true
+                log: false,
+                testOnInit: true,
+                onFailed(connection) {
+                    throw new DatabaseConnectionError(connection);
+                }
             }
         });
         const db = client.addRepositories({
@@ -64,7 +74,7 @@ export default class PostgresMigration {
     }
 
     /**
-     * Reads config json and return config object
+     * Reads config json and returns config object
      * @returns config object
      */
     private configure(params: CliArgs): ConfigObject {
@@ -134,7 +144,7 @@ export default class PostgresMigration {
     }
 
     /**
-     *
+     * Defines which action will be run
      * @param args Additional cli arguments
      */
     async run(args?: AdditionalArgs) {
@@ -148,11 +158,11 @@ export default class PostgresMigration {
         }
         if (this.action === 'up') {
             // this.migrationSteps(args);
-            await this.applyMigrations('up');
+            await this.startMigration('up');
         }
         if (this.action === 'down') {
             // this.migrationSteps(args);
-            await this.applyMigrations('down');
+            await this.startMigration('down');
         }
     }
 
@@ -165,92 +175,175 @@ export default class PostgresMigration {
     }
 
     /**
-     * Applies up or down migrations against selected database
-     * @param steps
-     * @returns
+     * Kicks off migration process, fowards down and up migration to respective methods
      */
-    private async applyMigrations(
-        direction: OperationType,
-        steps?: number
-    ): Promise<void> {
+    private async startMigration(direction: OperationType, steps?: number) {
         // create migration table
         await this.db.repos.migrationTable.create(this.config.database.table);
 
-        const migrationsApplied = await this.listAppliedMigrations();
         const migrationFiles = await this.listMigrationsFiles();
-        let migrationsToApply: MigrationFile[] = [];
 
         if (direction === 'down') {
-            if (migrationsApplied.length === 0)
-                throw new MigrationError(
-                    '[DOWN] migration not possible. No migrations have been applied'
-                );
-            migrationsToApply = migrationFiles.filter((f) => f.applied);
+            return this.downMigration(migrationFiles, steps);
         }
-
         if (direction === 'up') {
-            migrationsToApply = migrationFiles.filter((f) => !f.applied);
+            return this.upMigration(migrationFiles, steps);
         }
+    }
+
+    /**
+     * Manages up migration process
+     * @returns
+     */
+    private async upMigration(migrationFiles: MigrationFiles, steps?: number) {
+        let migrationQueue: MigrationQueue = [];
+
+        // exclude already applied files as well as push sql and filename to queue
+        migrationQueue = migrationFiles
+            .filter((f) => !f.applied)
+            .map((f) => ({
+                name: f.filename,
+                sql: f['up']
+            }));
 
         // filter steps
         if (steps) {
-            migrationsToApply = migrationsToApply.slice(steps);
+            migrationQueue = migrationQueue.slice(steps);
         }
 
-        if (migrationsToApply.length === 0) {
-            throw new MigrationWarning(
-                `No migrations are pending for [${direction.toUpperCase()}]`
+        return this.applyMigrationQueue(migrationQueue).then(
+            async (migrations) => {
+                if (migrations.applied.length > 0) {
+                    // consolidate which migration files have been successfully applied
+                    const appliedFiles = migrationFiles.filter((f) =>
+                        migrations.applied.includes(f.filename)
+                    );
+
+                    // register applied migrations in _migrations db table for tracking
+                    await this.db.repos.migrationRecord.add(
+                        this.config.database.table,
+                        appliedFiles
+                    );
+
+                    // update status
+                    this._status.status = 'UP_MIGRATIONS_COMPLETED';
+                    this._status.info = {
+                        applied: migrations.applied,
+                        skipped: migrations.skipped
+                    };
+
+                    // todo logging
+                } else {
+                    // no migrations applied
+                    this._status.status = 'NO_MIGRATIONS_APPLIED';
+                }
+            }
+        );
+    }
+
+    /**
+     * Manages down migration process
+     * @returns
+     */
+    private async downMigration(
+        migrationFiles: MigrationFile[],
+        steps?: number
+    ) {
+        let migrationQueue: MigrationQueue = [];
+
+        if ((await this.listAppliedMigrations()).length === 0)
+            throw new MigrationError(
+                '[DOWN] migration not possible. No migrations have been applied'
             );
+
+        // filter steps
+        if (steps) {
+            migrationQueue = migrationQueue.slice(steps);
         }
 
-        // apply migrations
-        await this.db.query
+        migrationQueue = migrationFiles
+            .filter((f) => f.applied)
+            .map((f) => ({
+                name: f.filename,
+                sql: f['down']
+            }));
+        return this.applyMigrationQueue(migrationQueue).then(
+            async (migrations) => {
+                if (migrations.applied.length > 0) {
+                    // consolidate which migration files have been successfully applied
+                    const appliedFiles = migrationFiles.filter((f) =>
+                        migrations.applied.includes(f.filename)
+                    );
+
+                    // remove records from in _migrations table
+                    await this.db.repos.migrationRecord.remove(
+                        this.config.database.table,
+                        appliedFiles.map((f) => f.filename)
+                    );
+
+                    // status
+                    this._status.status = 'DOWN_MIGRATIONS_COMPLETED';
+                    this._status.info = {
+                        applied: migrations.applied,
+                        skipped: migrations.skipped
+                    };
+                } else {
+                    // no migrations applied
+                    this._status.status = 'NO_MIGRATIONS_APPLIED';
+                }
+            }
+        );
+    }
+
+    /**
+     * Applies up or down migrations against selected database
+     * @param migrations
+     * @returns
+     */
+    private async applyMigrationQueue(migrationQueue: MigrationQueue) {
+        if (migrationQueue.length === 0) {
+            throw new MigrationWarning('No migrations are pending');
+        }
+
+        // apply queue in db transaction
+        return this.db.query
             .transaction(async (t) => {
                 return Promise.all(
-                    migrationsToApply.map(async (m) => {
-                        const migrationCommand = m[direction];
-
-                        // check if migrationCommand for direction exists in file
-                        if (migrationCommand) {
-                            await t.run(m[direction]).none();
+                    migrationQueue.map(async (m) => {
+                        if (m.sql && m.sql.length > 0) {
+                            await t.run(m.sql).none();
 
                             return {
-                                succes: true,
-                                migration: m
-                            };
-                        } else {
-                            return {
-                                succes: false,
-                                migration: m
-                                // error: ''
+                                applied: true,
+                                name: m.name
                             };
                         }
+                        return {
+                            applied: false,
+                            name: m.name
+                        };
                     })
                 );
             })
             .then(async (m) => {
-                const success = m
-                    .filter((m) => m.succes)
-                    .map((m) => m.migration);
-
-                await this.db.repos.migrationRecord.add(
-                    this.config.database.table,
-                    success
-                );
-
-                this._status.status = 'UP_MIGRATIONS_COMPLETED';
-                this._status.info = {
-                    applied: [],
-                    skipped: []
+                // split migrations in applied and skipped ones
+                return {
+                    applied: m.filter((m) => m.applied).map((m) => m.name),
+                    skipped: m.filter((m) => !m.applied).map((m) => m.name)
                 };
             })
             .catch((err) => {
-                console.log(err);
+                // todo get filename where error occurs
+                if (err instanceof QueryExecutionError) {
+                    console.log('eee', err.message, err.query);
+                }
+                this._status.status = 'FAILED';
+                throw new Error('ROLLBACK');
             });
     }
 
     /**
-     * Get and returns how many migrations steps should be executed
+     * Define how many migrations steps should be executed
      * @param args Additional cli arguments
      * @returns
      */
@@ -264,26 +357,24 @@ export default class PostgresMigration {
     /**
      * Reads all files in migration directory and returns .sql files
      */
-    private async listMigrationsFiles() {
+    private async listMigrationsFiles(): Promise<MigrationFile[]> {
         const dirFiles = readdirSync(this.config.migrationDir);
         const appliedMigrations = await this.listAppliedMigrations();
 
-        const migrationFiles: MigrationFile[] = [];
-
-        dirFiles.forEach((f) => {
-            if (f.endsWith('.sql')) {
-                const [ts_, title] = f.split('_');
-                const ts = Number.parseInt(ts_);
+        return dirFiles
+            .filter((f) => f.endsWith('.sql'))
+            .map((f) => {
+                const [ts, title] = f.split('_');
 
                 const fullpath = path.join(this.config.migrationDir, f);
 
                 const fileContent = this.readMigrationFile(fullpath);
                 const hash = this.hashSql(fileContent.content);
 
-                migrationFiles.push({
+                return {
                     fullpath,
                     filename: f,
-                    ts,
+                    ts: Number.parseInt(ts),
                     title,
                     applied: appliedMigrations
                         .map((f) => f.filename)
@@ -292,11 +383,9 @@ export default class PostgresMigration {
                     up: fileContent.up,
                     down: fileContent.down,
                     hash
-                });
-            }
-        });
-
-        return migrationFiles.sort((a, b) => a.ts - b.ts);
+                };
+            })
+            .sort((a, b) => a.ts - b.ts);
     }
 
     /**

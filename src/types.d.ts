@@ -29,7 +29,7 @@ export type ConfigFile = {
 };
 
 /**
- * Read migration file and adds meta info
+ * Migration file with meta info
  */
 export type MigrationFile = {
     fullpath: string;
@@ -42,6 +42,12 @@ export type MigrationFile = {
     content: string;
     hash: string;
 };
+export type MigrationFiles = MigrationFile[];
+
+export type MigrationQueue = {
+    sql: string;
+    name: string;
+}[];
 
 export type ActionType = typeof DEFAULTS.commands[number];
 export type OperationType = 'up' | 'down';
@@ -115,12 +121,14 @@ export type MigrationStatus = {
 };
 
 export type RunStatus =
+    | 'FAILED'
     | 'PENDING'
     | 'FILE_CREATED'
     | 'UP_MIGRATIONS_COMPLETED'
     | 'DOWN_MIGRATIONS_COMPLETED'
     | 'MIGRATIONS_RESET_COMPLETED'
-    | 'MIGRATIONS_REDO_COMPLETED';
+    | 'MIGRATIONS_REDO_COMPLETED'
+    | 'NO_MIGRATIONS_APPLIED';
 
 export type CliArgs = {
     configPath?: string;

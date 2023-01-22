@@ -1,2 +1,2 @@
 DELETE FROM $<table:name>
-WHERE "filename" = $<filename>
+WHERE "filename" IN ($<filename:list>)

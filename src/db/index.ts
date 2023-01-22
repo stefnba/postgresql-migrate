@@ -1,12 +1,8 @@
+import dayjs from 'dayjs';
 import { DatabaseRepository } from 'postgresql-node';
-import type {
-    MigrationTableModel,
-    ColumnTypesModel,
-    MigrationRecordData,
-    MigrationFile
-} from '../types';
+import type { MigrationTableModel, MigrationFiles } from '../types';
 
-export class MigrationTable extends DatabaseRepository<any> {
+export class MigrationTable extends DatabaseRepository {
     sqlFilesDir = [__dirname, 'sql'];
 
     create(migrationTable: string) {
@@ -18,7 +14,7 @@ export class MigrationTable extends DatabaseRepository<any> {
     }
 }
 
-export class MigrationRecord extends DatabaseRepository<any> {
+export class MigrationRecord extends DatabaseRepository<MigrationTableModel> {
     sqlFilesDir = [__dirname, 'sql'];
 
     async list(migrationTable: string) {
@@ -32,17 +28,29 @@ export class MigrationRecord extends DatabaseRepository<any> {
         return [];
     }
 
-    remove(migrationTable: string, filename: string) {
-        return this.query.run('', {
-            table: migrationTable,
-            filename: filename
-        });
+    remove(migrationTable: string, filenames: string[]) {
+        return this.query
+            .run(this.sqlFile('deleteMigrationRecord.sql'), {
+                table: migrationTable,
+                filename: filenames
+            })
+            .manyOrNone();
     }
 
-    add(migrationTable: string, data: MigrationFile[]) {
-        const columns = [''];
+    add(migrationTable: string, data: MigrationFiles) {
+        const columns = this.columnSet([
+            'content',
+            'filename',
+            'hash',
+            { name: 'createdAt', prop: 'ts', init: (col) => dayjs(col.value) },
+            'title'
+        ]);
         return this.query
-            .add(data, { returning: '*', columns, table: migrationTable })
+            .add(data, {
+                returning: '*',
+                columns,
+                table: migrationTable
+            })
             .many<MigrationTableModel>();
     }
 }
