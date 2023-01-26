@@ -146,7 +146,8 @@ export type RunStatus =
     | 'DOWN_MIGRATIONS_COMPLETED'
     | 'MIGRATIONS_RESET_COMPLETED'
     | 'MIGRATIONS_REDO_COMPLETED'
-    | 'NO_MIGRATIONS_APPLIED';
+    | 'NO_MIGRATIONS_APPLIED'
+    | 'STATUS_DISPLAYED';
 
 export type CliArgs = {
     configPath?: string;

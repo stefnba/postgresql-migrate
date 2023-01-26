@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import dayjs from 'dayjs';
 import PostgresClient from 'postgresql-node';
 import { DatabaseClientExtended } from 'postgresql-node/lib/types';
+import { QueryExecutionError } from 'postgresql-node/lib/error';
 
 import { replaceEnvVar, setFilePath } from './utils';
 import { MigrationRecord, MigrationTable } from './db';
@@ -26,7 +27,7 @@ import type {
     MigrationOptions
 } from './types';
 import { DatabaseConnectionError, MigrationError } from './error';
-import { QueryExecutionError } from 'postgresql-node/lib/error';
+
 import Logger from './logger';
 
 /**
@@ -160,7 +161,7 @@ export default class PostgresMigration {
             await this.dbInit();
 
             if (this.action === 'status') {
-                console.log('status');
+                return this.migrationStatus();
             }
             if (this.action === 'create') {
                 this.createMigrationFile(args);
@@ -180,6 +181,37 @@ export default class PostgresMigration {
                 return;
             }
         }
+    }
+
+    private async migrationStatus() {
+        Logger.info({ title: 'Migration Status:' }, { endWithNewLine: true });
+
+        const appliedMigrations = await this.listAppliedMigrations();
+        const pendingMigrationFiles = (await this.listMigrationsFiles()).filter(
+            (f) => !f.applied
+        );
+
+        if (appliedMigrations.length > 0) {
+            Logger.info(
+                {
+                    message: `Applied migrations (${appliedMigrations.length}):`,
+                    bullets: appliedMigrations.map((f) => f.filename)
+                },
+                { endWithNewLine: true, message: chalk.blue }
+            );
+        }
+
+        if (pendingMigrationFiles.length > 0) {
+            Logger.info(
+                {
+                    message: `Pending migrations (${pendingMigrationFiles.length}):`,
+                    bullets: pendingMigrationFiles.map((f) => f.filename)
+                },
+                { endWithNewLine: true, message: chalk.blue }
+            );
+        }
+
+        this._status.status = 'STATUS_DISPLAYED';
     }
 
     /**
@@ -354,20 +386,37 @@ export default class PostgresMigration {
             .transaction(async (t) => {
                 return Promise.all(
                     realQueue.map(async (m) => {
-                        await t.run(m.sql).none();
-
-                        return m.name;
+                        try {
+                            await t.run(m.sql).none();
+                            return m.name;
+                        } catch (err) {
+                            // console.log(m);
+                            // throw err;
+                            return Promise.reject({
+                                err,
+                                filename: m.name
+                            });
+                        }
                     })
                 );
             })
-            .catch((err) => {
-                // todo get filename where error occurs
-                if (err instanceof QueryExecutionError) {
-                    console.log('eee', err.message, err.query);
-                }
+            .catch((err: { err: QueryExecutionError; filename: string }) => {
+                const { err: error, filename } = err;
+
+                const message = `File "${filename}" could not be applied due to "${error.message}"`;
+
+                // status
                 this._status.status = 'FAILED';
-                Logger.error('ROLLBACK');
-                throw new Error('ROLLBACK');
+                this._status.error = { message, code: 'MIGRATION_ERROR' };
+
+                // log
+                Logger.error({
+                    title: 'Migration Error',
+                    message,
+                    info: `Query: ${error.query}`
+                });
+
+                throw new MigrationError(message, filename, error);
             });
     }
 
@@ -462,7 +511,7 @@ export default class PostgresMigration {
      */
     private createMigrationFile(params?: AdditionalArgs): void {
         if (!params || params.length === 0 || typeof params[0] !== 'string') {
-            throw new MigrationError(
+            throw new Error(
                 'A name must be provided to create a migration file'
             );
         }
