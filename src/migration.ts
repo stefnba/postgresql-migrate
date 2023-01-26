@@ -336,7 +336,7 @@ export default class PostgresMigration {
         if ((await this.listAppliedMigrations()).length === 0) {
             Logger.warning({
                 title: '[DOWN] migration not possible',
-                message: 'No migrations have been applied'
+                message: 'No migrations are currently applied'
             });
             return;
         }
@@ -603,7 +603,6 @@ export default class PostgresMigration {
      * @returns types string for TypeScript
      */
     private async parseDataTypes(): Promise<string> {
-        console.log('asdf');
         const columns = await this.db.repos.dataTypes.list(
             this.config.database.schema,
             this.config.database.table

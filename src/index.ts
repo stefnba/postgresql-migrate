@@ -106,8 +106,6 @@ const main = async () => {
     );
     await migration.run(argv._);
 
-    console.log(migration.status());
-
     process.exit();
 };
 

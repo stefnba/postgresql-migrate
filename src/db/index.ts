@@ -52,7 +52,7 @@ export class MigrationRecord extends DatabaseRepository<MigrationTableModel> {
             .find(this.queries.getMigrationHistory, {
                 params: { table: migrationTable }
             })
-            .manyOrNone<MigrationTableModel>();
+            .many<MigrationTableModel>();
 
         if (result) return result;
         return [];
@@ -64,7 +64,7 @@ export class MigrationRecord extends DatabaseRepository<MigrationTableModel> {
                 table: migrationTable,
                 filename: filenames
             })
-            .manyOrNone();
+            .many();
     }
 
     add(migrationTable: string, data: MigrationFiles) {
