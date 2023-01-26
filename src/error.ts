@@ -1,29 +1,21 @@
 import { ConnectionEventFailParams } from 'postgresql-node/lib/types';
-
-export type LogLevel = 'WARNING' | 'ERROR' | 'INFO' | 'SUCCESS';
+import { QueryExecutionError } from 'postgresql-node/lib/error';
 
 export class MigrationError extends Error {
-    private level: LogLevel;
+    query?: string;
+    filename: string;
+    cause: QueryExecutionError;
 
-    constructor(message: string) {
+    constructor(message: string, filename: string, cause: QueryExecutionError) {
         super(message);
 
         this.message = message;
-        this.level = 'ERROR';
+        this.cause = cause;
+        this.filename = filename;
+        this.query = cause.query;
 
         Object.setPrototypeOf(this, new.target.prototype);
         Error.captureStackTrace(this, this.constructor);
-    }
-}
-
-export class MigrationWarning extends Error {
-    private level: LogLevel;
-
-    constructor(message: string) {
-        super(message);
-
-        this.message = message;
-        this.level = 'WARNING';
     }
 }
 

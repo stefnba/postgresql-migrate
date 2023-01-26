@@ -79,19 +79,19 @@ export type ColumnTypesModel = {
     }>;
 };
 
-export type WarningObject = {
-    name: string;
-    hash: string;
-    resource: 'DB' | 'FILE';
-    msg: 'CONTENT_CHANGED' | 'MISSING' | 'DUPLICATE_HASH';
-};
+// export type WarningObject = {
+//     name: string;
+//     hash: string;
+//     resource: 'DB' | 'FILE';
+//     msg: 'CONTENT_CHANGED' | 'MISSING' | 'DUPLICATE_HASH';
+// };
 
-export type ErrorObject = {
-    name: string;
-    hash: string;
-    resource: 'DB' | 'FILE';
-    msg: 'DUPLICATE_TS';
-};
+// export type ErrorObject = {
+//     name: string;
+//     hash: string;
+//     resource: 'DB' | 'FILE';
+//     msg: 'DUPLICATE_TS';
+// };
 
 /**
  * Logger
@@ -134,6 +134,7 @@ export type AdditionalArgs = (string | number)[];
 export type MigrationStatus = {
     action: ActionType;
     status: undefined | RunStatus;
+    error?: { message: string; code: 'MIGRATION_ERROR' };
     info?: Record<string, unknown>;
 };
 
