@@ -6,12 +6,13 @@ import PostgresMigration from './migration';
 import type { ActionType, CliArgs } from './types';
 
 process.on('uncaughtException', (err) => {
-    console.error(err);
+    // console.error(err);
     process.exit(1);
 });
 
 const argv = yargs
-    .usage('Usage: $0 [up|down|create|redo|reset|setup|status] [config]')
+    // todo update
+    .usage('Usage: [up|down|create|redo|reset|setup|status] [config]')
     .option('c', {
         alias: 'config',
         describe: 'Path to config file',
@@ -94,10 +95,15 @@ const main = async () => {
         };
     }
 
-    const migration = new PostgresMigration({
-        action,
-        cliArgs
-    });
+    const migration = new PostgresMigration(
+        {
+            action,
+            cliArgs
+        },
+        {
+            suppressErrors: true
+        }
+    );
     await migration.run(argv._);
 
     console.log(migration.status());

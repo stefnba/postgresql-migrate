@@ -22,29 +22,31 @@ import type {
     MigrationTableModel,
     MigrationFile,
     OperationType,
-    MigrationFiles
+    MigrationFiles,
+    MigrationOptions
 } from './types';
-import {
-    DatabaseConnectionError,
-    MigrationError,
-    MigrationWarning
-} from './error';
+import { DatabaseConnectionError, MigrationError } from './error';
 import { QueryExecutionError } from 'postgresql-node/lib/error';
+import Logger from './logger';
 
+/**
+ * Main Migration Class that handles various migration jobs
+ */
 export default class PostgresMigration {
     db!: DatabaseClientExtended<{
         migrationRecord: typeof MigrationRecord;
         migrationTable: typeof MigrationTable;
     }>;
-
     config: ConfigObject;
     private _status: MigrationStatus;
     private action: ActionType;
     private appliedMigrations!: MigrationTableModel[];
+    private options?: MigrationOptions;
 
-    constructor(params: MigrationParams) {
+    constructor(params: MigrationParams, options?: MigrationOptions) {
         this.config = this.configure(params.cliArgs);
         this.action = params.action;
+        this.options = options;
 
         this._status = {
             action: params.action,
@@ -61,6 +63,12 @@ export default class PostgresMigration {
                 log: false,
                 testOnInit: true,
                 onFailed(connection) {
+                    Logger.error({
+                        title: 'DB Connection Error',
+                        data: connection.connection,
+                        message: `${connection.error?.message} (${connection.error?.type})`
+                    });
+
                     throw new DatabaseConnectionError(connection);
                 }
             }
@@ -148,21 +156,29 @@ export default class PostgresMigration {
      * @param args Additional cli arguments
      */
     async run(args?: AdditionalArgs) {
-        await this.dbInit();
+        try {
+            await this.dbInit();
 
-        if (this.action === 'status') {
-            console.log('status');
-        }
-        if (this.action === 'create') {
-            this.createMigrationFile(args);
-        }
-        if (this.action === 'up') {
-            // this.migrationSteps(args);
-            await this.startMigration('up');
-        }
-        if (this.action === 'down') {
-            // this.migrationSteps(args);
-            await this.startMigration('down');
+            if (this.action === 'status') {
+                console.log('status');
+            }
+            if (this.action === 'create') {
+                this.createMigrationFile(args);
+            }
+            if (
+                this.action === 'up' ||
+                this.action === 'down'
+                // this.action === 'redo'
+            ) {
+                // this.migrationSteps(args);
+                await this.startMigration(this.action);
+            }
+        } catch (err) {
+            if (!this.options?.suppressErrors) {
+                throw err;
+            } else {
+                return;
+            }
         }
     }
 
@@ -178,16 +194,24 @@ export default class PostgresMigration {
      * Kicks off migration process, fowards down and up migration to respective methods
      */
     private async startMigration(direction: OperationType, steps?: number) {
+        Logger.info(`Initiating [${direction.toUpperCase()}] migration...`, {
+            endWithNewLine: true
+        });
+
         // create migration table
         await this.db.repos.migrationTable.create(this.config.database.table);
 
         const migrationFiles = await this.listMigrationsFiles();
 
         if (direction === 'down') {
-            return this.downMigration(migrationFiles, steps);
+            await this.downMigration(migrationFiles, steps);
         }
         if (direction === 'up') {
-            return this.upMigration(migrationFiles, steps);
+            await this.upMigration(migrationFiles, steps);
+        }
+        if (direction === 'redo') {
+            await this.downMigration(migrationFiles, steps);
+            await this.upMigration(migrationFiles, steps);
         }
     }
 
@@ -213,10 +237,10 @@ export default class PostgresMigration {
 
         return this.applyMigrationQueue(migrationQueue).then(
             async (migrations) => {
-                if (migrations.applied.length > 0) {
+                if (migrations.length > 0) {
                     // consolidate which migration files have been successfully applied
                     const appliedFiles = migrationFiles.filter((f) =>
-                        migrations.applied.includes(f.filename)
+                        migrations.includes(f.filename)
                     );
 
                     // register applied migrations in _migrations db table for tracking
@@ -228,14 +252,14 @@ export default class PostgresMigration {
                     // update status
                     this._status.status = 'UP_MIGRATIONS_COMPLETED';
                     this._status.info = {
-                        applied: migrations.applied,
-                        skipped: migrations.skipped
+                        ...this._status.info,
+                        applied: migrations
                     };
 
-                    // todo logging
-                } else {
-                    // no migrations applied
-                    this._status.status = 'NO_MIGRATIONS_APPLIED';
+                    // logging
+                    Logger.success({
+                        title: '[UP] Migration successful'
+                    });
                 }
             }
         );
@@ -251,10 +275,13 @@ export default class PostgresMigration {
     ) {
         let migrationQueue: MigrationQueue = [];
 
-        if ((await this.listAppliedMigrations()).length === 0)
-            throw new MigrationError(
-                '[DOWN] migration not possible. No migrations have been applied'
-            );
+        if ((await this.listAppliedMigrations()).length === 0) {
+            Logger.warning({
+                title: '[DOWN] migration not possible',
+                message: 'No migrations have been applied'
+            });
+            return;
+        }
 
         // filter steps
         if (steps) {
@@ -267,12 +294,13 @@ export default class PostgresMigration {
                 name: f.filename,
                 sql: f['down']
             }));
+
         return this.applyMigrationQueue(migrationQueue).then(
             async (migrations) => {
-                if (migrations.applied.length > 0) {
+                if (migrations.length > 0) {
                     // consolidate which migration files have been successfully applied
                     const appliedFiles = migrationFiles.filter((f) =>
-                        migrations.applied.includes(f.filename)
+                        migrations.includes(f.filename)
                     );
 
                     // remove records from in _migrations table
@@ -284,12 +312,14 @@ export default class PostgresMigration {
                     // status
                     this._status.status = 'DOWN_MIGRATIONS_COMPLETED';
                     this._status.info = {
-                        applied: migrations.applied,
-                        skipped: migrations.skipped
+                        ...this._status.info,
+                        applied: migrations
                     };
-                } else {
-                    // no migrations applied
-                    this._status.status = 'NO_MIGRATIONS_APPLIED';
+
+                    // logging
+                    Logger.success({
+                        title: '[DOWN] Migration successful'
+                    });
                 }
             }
         );
@@ -301,36 +331,34 @@ export default class PostgresMigration {
      * @returns
      */
     private async applyMigrationQueue(migrationQueue: MigrationQueue) {
-        if (migrationQueue.length === 0) {
-            throw new MigrationWarning('No migrations are pending');
+        // empty migration commands
+        const emptyCommands = migrationQueue.filter((m) => m.sql.length === 0);
+        if (emptyCommands) {
+            this._status.info = {
+                ...this._status.info,
+                skipped: emptyCommands.map((c) => c.name)
+            };
+        }
+
+        // exclude empty files
+        const realQueue = migrationQueue.filter((m) => m.sql.length > 0);
+
+        // no migrations applied
+        if (realQueue.length === 0) {
+            Logger.warning({ title: 'No migrations are pending' });
+            this._status.status = 'NO_MIGRATIONS_APPLIED';
         }
 
         // apply queue in db transaction
         return this.db.query
             .transaction(async (t) => {
                 return Promise.all(
-                    migrationQueue.map(async (m) => {
-                        if (m.sql && m.sql.length > 0) {
-                            await t.run(m.sql).none();
+                    realQueue.map(async (m) => {
+                        await t.run(m.sql).none();
 
-                            return {
-                                applied: true,
-                                name: m.name
-                            };
-                        }
-                        return {
-                            applied: false,
-                            name: m.name
-                        };
+                        return m.name;
                     })
                 );
-            })
-            .then(async (m) => {
-                // split migrations in applied and skipped ones
-                return {
-                    applied: m.filter((m) => m.applied).map((m) => m.name),
-                    skipped: m.filter((m) => !m.applied).map((m) => m.name)
-                };
             })
             .catch((err) => {
                 // todo get filename where error occurs
@@ -338,6 +366,7 @@ export default class PostgresMigration {
                     console.log('eee', err.message, err.query);
                 }
                 this._status.status = 'FAILED';
+                Logger.error('ROLLBACK');
                 throw new Error('ROLLBACK');
             });
     }

@@ -1,5 +1,5 @@
 /* UP */
-CREATE TABLE IF NOTa EXISTS users (
+CREATE TABLE IF NOT EXISTS users (
     "id" int,
     "name" varchar)
 /* DOWN */

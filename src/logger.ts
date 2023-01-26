@@ -17,7 +17,11 @@ export default class Logger {
      */
     private log(message: LogMessage, style: LogStyle) {
         if (typeof message === 'string') {
-            this.logMessage(message, style.title);
+            this.logMessage(message, style.message);
+            // new line
+            if (style.endWithNewLine) {
+                log('\n');
+            }
             return;
         }
 

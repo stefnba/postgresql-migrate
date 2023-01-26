@@ -52,7 +52,7 @@ export type MigrationQueue = {
 }[];
 
 export type ActionType = typeof DEFAULTS.commands[number];
-export type OperationType = 'up' | 'down';
+export type OperationType = 'up' | 'down' | 'redo';
 
 export type MigrationTableModel = {
     id: number;
