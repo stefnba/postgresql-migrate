@@ -156,7 +156,7 @@ export default class PostgresMigration {
      * Defines which action will be run
      * @param args Additional cli arguments
      */
-    async run(args?: AdditionalArgs) {
+    async run(args: AdditionalArgs = []) {
         try {
             await this.dbInit();
 
@@ -171,8 +171,7 @@ export default class PostgresMigration {
                 this.action === 'down'
                 // this.action === 'redo'
             ) {
-                // this.migrationSteps(args);
-                await this.startMigration(this.action);
+                await this.startMigration(this.action, args);
             }
         } catch (err) {
             if (!this.options?.suppressErrors) {
@@ -225,10 +224,20 @@ export default class PostgresMigration {
     /**
      * Kicks off migration process, fowards down and up migration to respective methods
      */
-    private async startMigration(direction: OperationType, steps?: number) {
-        Logger.info(`Initiating [${direction.toUpperCase()}] migration...`, {
-            endWithNewLine: true
-        });
+    private async startMigration(
+        direction: OperationType,
+        args: AdditionalArgs
+    ) {
+        const steps = this.migrationSteps(args);
+
+        Logger.info(
+            `Initiating [${direction.toUpperCase()}] migration ${
+                steps ? `(${steps} steps)` : ''
+            }`,
+            {
+                endWithNewLine: true
+            }
+        );
 
         // create migration table
         await this.db.repos.migrationTable.create(this.config.database.table);
@@ -264,7 +273,7 @@ export default class PostgresMigration {
 
         // filter steps
         if (steps) {
-            migrationQueue = migrationQueue.slice(steps);
+            migrationQueue = migrationQueue.slice(0, steps);
         }
 
         return this.applyMigrationQueue(migrationQueue).then(
@@ -290,7 +299,9 @@ export default class PostgresMigration {
 
                     // logging
                     Logger.success({
-                        title: '[UP] Migration successful'
+                        title: '[UP] Migration successful',
+                        message: `${migrations.length} steps applied`,
+                        bullets: migrations.map((m) => m)
                     });
                 }
             }
@@ -350,7 +361,9 @@ export default class PostgresMigration {
 
                     // logging
                     Logger.success({
-                        title: '[DOWN] Migration successful'
+                        title: '[DOWN] Migration successful',
+                        message: `${migrations.length} steps applied`,
+                        bullets: migrations.map((m) => m)
                     });
                 }
             }
@@ -425,11 +438,20 @@ export default class PostgresMigration {
      * @param args Additional cli arguments
      * @returns
      */
-    private migrationSteps(args?: AdditionalArgs) {
-        if (!args || args.length || !Number.isInteger(args[0])) {
-            throw new Error('Steps must be an Integer');
+    private migrationSteps(args: AdditionalArgs): number | undefined {
+        if (args.length > 0) {
+            if (
+                args.length > 1 ||
+                !Number.isInteger(args[0]) ||
+                typeof args[0] !== 'number'
+            ) {
+                const msg = 'Migration steps argument must be an Integer';
+                Logger.warning(msg);
+                throw Error(msg);
+            }
+            return args[0];
         }
-        return Number(args[0]);
+        return;
     }
 
     /**
