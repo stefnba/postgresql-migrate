@@ -1,3 +1,5 @@
+import { Chalk } from 'chalk';
+
 import DEFAULTS from './defaults';
 
 /**
@@ -91,20 +93,32 @@ export type ErrorObject = {
     msg: 'DUPLICATE_TS';
 };
 
-export type TextWithColor = {
-    text: string;
-    color?: 'blue' | 'yellow' | 'red' | 'white' | 'green';
-    bgColor?: 'bgRed' | 'bgGreen' | 'bgYellow';
+/**
+ * Logger
+ */
+export type LogMessage =
+    | string
+    | undefined
+    | {
+          title?: string;
+          message?: string;
+          info?: string;
+          bullets?: Bullets;
+          data?: object;
+      };
+export type LogStyle = {
+    title?: Chalk;
+    message?: Chalk;
+    info?: Chalk;
+    endWithNewLine?: boolean;
 };
-export type LoggerHeaderParam = string | TextWithColor;
-export type LoggerMsgParam = string | TextWithColor;
-export type LoggerListParam = string[];
-export type LoggerTypeParam = 'WARNING' | 'ERROR';
-export type LoggerOptionParam = {
-    onlyWithListElements?: boolean;
-    type?: LoggerTypeParam;
-    newLine?: boolean;
-};
+export type Bullets =
+    | Array<string>
+    | {
+          title?: string;
+          bullets: Array<string>;
+          sign?: boolean | string;
+      };
 
 /**
  * Main Migration
@@ -112,6 +126,9 @@ export type LoggerOptionParam = {
 export interface MigrationParams {
     action: ActionType;
     cliArgs: CliArgs;
+}
+export interface MigrationOptions {
+    suppressErrors?: boolean;
 }
 export type AdditionalArgs = (string | number)[];
 export type MigrationStatus = {
