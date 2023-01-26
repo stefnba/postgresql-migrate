@@ -38,7 +38,7 @@ describe('CONFIG', () => {
             path.join(process.cwd(), path.dirname(configPath), './migrations')
         );
         expect(migration.config.typesFile).to.equal(
-            path.join(process.cwd(), path.dirname(configPath), './model.d.ts')
+            path.join(process.cwd(), path.dirname(configPath), './models.d.ts')
         );
     });
     it('Should CREATE CONFIG from .json file but overwrite database name', async () => {
@@ -63,7 +63,7 @@ describe('CONFIG', () => {
             path.join(process.cwd(), path.dirname(configPath), './migrations')
         );
         expect(migration.config.typesFile).to.equal(
-            path.join(process.cwd(), path.dirname(configPath), './model.d.ts')
+            path.join(process.cwd(), path.dirname(configPath), './models.d.ts')
         );
     });
     it('Should CREATE CONFIG from .json file but overwrite path to types file', async () => {

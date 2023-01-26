@@ -7,5 +7,5 @@
         "database": "env:DB_NAME"
     },
     "migrations": "./migrations",
-    "typesFile": "./model.d.ts"
+    "typesFile": "./models.d.ts"
 }
