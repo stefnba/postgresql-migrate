@@ -5,9 +5,13 @@ import type { MigrationTableModel, MigrationFiles } from '../types';
 export class MigrationTable extends DatabaseRepository {
     sqlFilesDir = [__dirname, 'sql'];
 
+    private queries = {
+        reateMigrationTable: this.sqlFile('createMigrationTable.sql')
+    };
+
     create(migrationTable: string) {
         return this.query
-            .run(this.sqlFile('createMigrationTable.sql'), {
+            .run(this.queries.reateMigrationTable, {
                 table: migrationTable
             })
             .none();
@@ -17,9 +21,14 @@ export class MigrationTable extends DatabaseRepository {
 export class MigrationRecord extends DatabaseRepository<MigrationTableModel> {
     sqlFilesDir = [__dirname, 'sql'];
 
+    private queries = {
+        getMigrationHistory: this.sqlFile('getMigrationHistory.sql'),
+        deleteMigrationRecord: this.sqlFile('deleteMigrationRecord.sql')
+    };
+
     async list(migrationTable: string) {
         const result = await this.query
-            .find(this.sqlFile('getMigrationHistory.sql'), {
+            .find(this.queries.getMigrationHistory, {
                 params: { table: migrationTable }
             })
             .manyOrNone<MigrationTableModel>();
@@ -30,7 +39,7 @@ export class MigrationRecord extends DatabaseRepository<MigrationTableModel> {
 
     remove(migrationTable: string, filenames: string[]) {
         return this.query
-            .run(this.sqlFile('deleteMigrationRecord.sql'), {
+            .run(this.queries.deleteMigrationRecord, {
                 table: migrationTable,
                 filename: filenames
             })
