@@ -8,7 +8,7 @@ import { DatabaseClientExtended } from 'postgresql-node/lib/types';
 import { QueryExecutionError } from 'postgresql-node/lib/error';
 
 import { replaceEnvVar, setFilePath } from './utils';
-import { MigrationRecord, MigrationTable } from './db';
+import { DataTypes, MigrationRecord, MigrationTable } from './db';
 import DEFAULTS from './defaults';
 
 import type {
@@ -30,6 +30,16 @@ import { DatabaseConnectionError, MigrationError } from './error';
 
 import Logger from './logger';
 
+// check if migration files have duplicate timestamp, causes error
+
+// check if migration files have same content
+
+// Migration in db but no file exists
+
+// check if multiple db records have same hash
+
+// drop all in db
+
 /**
  * Main Migration Class that handles various migration jobs
  */
@@ -37,6 +47,7 @@ export default class PostgresMigration {
     db!: DatabaseClientExtended<{
         migrationRecord: typeof MigrationRecord;
         migrationTable: typeof MigrationTable;
+        dataTypes: typeof DataTypes;
     }>;
     config: ConfigObject;
     private _status: MigrationStatus;
@@ -76,7 +87,8 @@ export default class PostgresMigration {
         });
         const db = client.addRepositories({
             migrationRecord: MigrationRecord,
-            migrationTable: MigrationTable
+            migrationTable: MigrationTable,
+            dataTypes: DataTypes
         });
 
         this.db = db;
@@ -177,6 +189,7 @@ export default class PostgresMigration {
             if (!this.options?.suppressErrors) {
                 throw err;
             } else {
+                console.log(err);
                 return;
             }
         }
@@ -303,6 +316,8 @@ export default class PostgresMigration {
                         message: `${migrations.length} steps applied`,
                         bullets: migrations.map((m) => m)
                     });
+
+                    await this.createDataTypeFile();
                 }
             }
         );
@@ -365,6 +380,8 @@ export default class PostgresMigration {
                         message: `${migrations.length} steps applied`,
                         bullets: migrations.map((m) => m)
                     });
+
+                    await this.createDataTypeFile();
                 }
             }
         );
@@ -579,5 +596,48 @@ export default class PostgresMigration {
                 .update(sql.replace(/\s{2,}|\n/g, ' '))
                 .digest('base64')
         );
+    }
+
+    /**
+     * Converts postgres data types to data types for TypeScript
+     * @returns types string for TypeScript
+     */
+    private async parseDataTypes(): Promise<string> {
+        console.log('asdf');
+        const columns = await this.db.repos.dataTypes.list(
+            this.config.database.schema,
+            this.config.database.table
+        );
+
+        return columns
+            .map((col) => {
+                const { tableName, columns } = col;
+                const colTypes = columns.map((c) => {
+                    return `${c.columnName}${
+                        c.isNullable === 'YES' ? '?' : ''
+                    }: ${
+                        DEFAULTS.dataTypeConversion[c.dataType] || 'unknown'
+                    };`;
+                });
+
+                const type = `export type ${tableName} = { \n${colTypes.join(
+                    '\n'
+                )} }\n`;
+                return type;
+            })
+            .join('\n');
+    }
+
+    /**
+     * Creates types.d.ts file with data types from database, only when path is provided in config.json
+     */
+    private async createDataTypeFile() {
+        const typesFile = this.config.typesFile;
+        if (!typesFile) return;
+        const dataTypes = await this.parseDataTypes();
+        writeFileSync(typesFile, dataTypes, {
+            encoding: 'utf8'
+        });
+        return;
     }
 }

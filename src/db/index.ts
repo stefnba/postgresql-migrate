@@ -1,20 +1,41 @@
 import dayjs from 'dayjs';
 import { DatabaseRepository } from 'postgresql-node';
-import type { MigrationTableModel, MigrationFiles } from '../types';
+import type {
+    MigrationTableModel,
+    MigrationFiles,
+    ColumnTypesModel
+} from '../types';
 
 export class MigrationTable extends DatabaseRepository {
     sqlFilesDir = [__dirname, 'sql'];
 
     private queries = {
-        reateMigrationTable: this.sqlFile('createMigrationTable.sql')
+        createMigrationTable: this.sqlFile('createMigrationTable.sql')
     };
 
     create(migrationTable: string) {
         return this.query
-            .run(this.queries.reateMigrationTable, {
+            .run(this.queries.createMigrationTable, {
                 table: migrationTable
             })
             .none();
+    }
+}
+
+export class DataTypes extends DatabaseRepository<ColumnTypesModel> {
+    sqlFilesDir = [__dirname, 'sql'];
+
+    private queries = {
+        getDataTypes: this.sqlFile('getDataTypes.sql')
+    };
+
+    list(schemaName: string, migrationsTable: string) {
+        return this.query
+            .run(this.queries.getDataTypes, {
+                schemaName,
+                migrationsTable
+            })
+            .many<ColumnTypesModel>();
     }
 }
 
